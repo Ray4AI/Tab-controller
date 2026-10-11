@@ -27,16 +27,25 @@ addons.mozilla.org for signing, then hand the signed file to your users.
 
 ## Installing the self-hosted build
 
-1. Build (or download) `dist/media-controller-2.0.xpi`.
-2. Submit that file at <https://addons.mozilla.org/developers/addon/submit/distribution> and
-   choose **"On your own"** (self-distribution). Mozilla signs it and gives you a signed `.xpi`.
-3. Publish the signed file (GitHub Releases works well) and set that URL in
-   [`updates.json`](updates.json) → `update_link`.
-4. Users install it by opening the `.xpi` in Firefox. Because `manifest.json` declares
-   `browser_specific_settings.gecko.update_url`, Firefox checks `updates.json` and
-   auto-updates from it.
+1. Download **`media-controller-<version>.zip`** from the Releases page.
+   It is the very same archive as the `.xpi`, but `npm run build:xpi` emits both names on
+   purpose: Firefox starts an add-on installation for *any* downloaded `.xpi` and discards the
+   temporary file when you cancel it, so a `.zip` is the only safe name for a file you want to
+   upload somewhere.
+2. Submit that `.zip` at <https://addons.mozilla.org/developers/addon/submit/distribution> and
+   choose **"On your own"** (self-distribution). Mozilla signs it and gives you a signed
+   `.xpi` to download.
+3. Save that signed file without letting Firefox swallow it — `curl -L -o media-controller-2.0.xpi <url>`
+   (works on Windows 10+, macOS, Linux) or another browser/profile.
+4. Upload the signed file to the release as **`media-controller-<version>.xpi`**; that is the
+   URL `updates.json` → `update_link` points at, so Firefox can auto-update from it.
+5. Users install it by opening the signed `.xpi` in Firefox (or by clicking the download link).
+   Because `manifest.json` declares `browser_specific_settings.gecko.update_url`, Firefox keeps
+   checking `updates.json`.
 
 The add-on id is `tab-controller@ray4ai.github.io`; keep it stable so updates keep working.
+It is a *different* add-on from the original AMO listing (`media-controller@extension.local`),
+so disable/uninstall that one after installing this build.
 
 ---
 
@@ -104,7 +113,7 @@ value instead of fighting it (primary video only).
 npm install            # puppeteer for the e2e suite
 npm test               # end-to-end tests (downloads Chromium)
 npm run build:manifests  # dist/chrome + dist/firefox manifests
-npm run build:xpi        # dist/media-controller-<version>.xpi (Firefox, self-hosted)
+npm run build:xpi        # dist/media-controller-<version>.xpi + .zip (Firefox, self-hosted)
 ```
 
 ### Layout
