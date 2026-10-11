@@ -103,6 +103,11 @@ Hover previews, ads and background clips never get one.
 
 ### 4. Overlay layout, auto-hide and wheel step
 
+| Floating badge | Side rail (collapsed) | Side rail (opened) |
+| :---: | :---: | :---: |
+| ![floating badge](docs/screenshots/badge-floating.png) | ![side rail](docs/screenshots/rail-collapsed.png) | ![side rail open](docs/screenshots/rail-open.png) |
+
+
 Everything is configurable in the popup's **Overlay & wheel** card and applies immediately to
 open tabs:
 

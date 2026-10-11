@@ -336,9 +336,12 @@
                 display: flex;
                 align-items: center;
                 gap: 2px;
-                background: rgba(15, 15, 20, 0.75);
-                backdrop-filter: blur(20px) saturate(180%);
-                -webkit-backdrop-filter: blur(20px) saturate(180%);
+                /* NOTE: no backdrop-filter anywhere in this widget. Chromium
+                   composites a filtered element (and in some versions its
+                   descendants) in a separate layer which made the slider
+                   popovers render washed out / invisible. Solid translucent
+                   colours look the same over a video and always paint. */
+                background: rgba(15, 15, 20, 0.86);
                 border: 1px solid rgba(255, 255, 255, 0.12);
                 border-radius: 100px;
                 padding: 2px 4px;
@@ -401,7 +404,10 @@
             .mc-badge.mc-strip-open .mc-zone.mc-open > .mc-vol-pop,
             .mc-badge.mc-strip-open .mc-zone.mc-open > .mc-eye-pop,
             .mc-badge.mc-strip-open .mc-zone.mc-open > .mc-save-pop {
-                transform: translateX(0) scale(1);
+                /* no transform at all here: an identity transform would promote
+                   the popover to its own composite layer, which some engines
+                   then paint late (invisible for a frame or two). */
+                transform: none;
             }
 
             .mc-badge.mc-dragging {
@@ -457,9 +463,7 @@
                 display: flex;
                 align-items: center;
                 gap: 6px;
-                background: rgba(24, 24, 37, 0.98);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
+                background: rgba(24, 24, 37, 0.97);
                 border: 1px solid rgba(255, 255, 255, 0.12);
                 border-radius: 12px;
                 padding: 8px 10px;
