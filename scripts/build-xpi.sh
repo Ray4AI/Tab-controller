@@ -32,8 +32,12 @@ node "$ROOT_DIR/scripts/build-manifests.js" > /dev/null
 rm -rf "$STAGE_DIR" "$OUT_XPI" "$OUT_ZIP"
 mkdir -p "$STAGE_DIR"
 
-cp -R src assets README.md LICENSE "$STAGE_DIR/"
+cp -R src assets docs README.md LICENSE "$STAGE_DIR/"
 cp dist/firefox/manifest.json "$STAGE_DIR/manifest.json"
+
+# assets/previews/*.png are store-listing screenshots, never referenced at
+# runtime — shipping them would only add ~2 MB to every install.
+rm -rf "$STAGE_DIR/assets/previews"
 
 ( cd "$STAGE_DIR" && zip -q -r -X "$OUT_XPI" . -x '*.DS_Store' -x '*__pycache__*' )
 cp "$OUT_XPI" "$OUT_ZIP"

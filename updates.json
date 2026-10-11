@@ -3,8 +3,8 @@
     "tab-controller@ray4ai.github.io": {
       "updates": [
         {
-          "version": "2.1",
-          "update_link": "https://github.com/Ray4AI/Tab-controller/releases/download/v2.1/media-controller-2.1.xpi",
+          "version": "2.2",
+          "update_link": "https://github.com/Ray4AI/Tab-controller/releases/download/v2.2/media-controller-2.2.xpi",
           "applications": {
             "gecko": {
               "strict_min_version": "142.0"

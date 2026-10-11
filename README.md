@@ -12,7 +12,7 @@ addons.mozilla.org for signing, then hand the signed file to your users.
 
 ---
 
-## What's new in v2.0
+## What's new in v2.x
 
 | | Before | Now (v2.0) |
 | :--- | :--- | :--- |
@@ -128,6 +128,15 @@ If you change the speed with YouTube's own gear icon or shortcuts, the extension
 value instead of fighting it (primary video only).
 
 ---
+
+## Privacy
+
+**No telemetry, no analytics, no network requests, no remote code, zero runtime dependencies.**
+Everything the extension stores (presets, whitelist, badge position, theme) lives in
+`chrome.storage.local` inside your own browser profile and is never transmitted. The full
+reproducible audit — including the one outbound request Firefox makes for self-hosted
+auto-updates, and what is stored under which key — is in
+[docs/PRIVACY-AUDIT.md](docs/PRIVACY-AUDIT.md).
 
 ## Development
 

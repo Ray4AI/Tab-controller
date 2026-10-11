@@ -22,7 +22,7 @@
     if (window.__mediaControllerInjected) return;
     window.__mediaControllerInjected = true;
 
-    const MC_VERSION = '2.1';
+    const MC_VERSION = '2.2';
     const SPEED_SCALE = 100;
     const MAX_BOOST = 5.0;
     const MIN_VIDEO_W = 120;
