@@ -61,7 +61,8 @@ server.listen(PORT, async () => {
             '--autoplay-policy=no-user-gesture-required',
             '--no-sandbox'
         ],
-        defaultViewport: { width: 1200, height: 900 }
+        defaultViewport: { width: 1200, height: 900 },
+        protocolTimeout: 30000
     });
 
     try {
@@ -80,6 +81,9 @@ server.listen(PORT, async () => {
 
         // Extension page used to talk to chrome.* APIs and drive chrome.storage.
         const admin = await browser.newPage();
+        const adminErrors = [];
+        admin.on('pageerror', (e) => adminErrors.push(String(e)));
+        admin.on('console', (m) => { if (m.type() === 'error') adminErrors.push(m.text()); });
         await admin.goto(`chrome-extension://${extensionId}/src/popup/popup.html`);
         await sleep(300);
 
@@ -283,6 +287,48 @@ server.listen(PORT, async () => {
         const page2Info = await badgeInfo();
         check(page2Info.hosts[0] && page2Info.hosts[0].volume === '330%',
             `tab preset survived navigation (${page2Info.hosts[0] && page2Info.hosts[0].volume})`);
+
+        // ── TEST 8: popup dashboard ──────────────────────────────────────
+        console.log('\n--- TEST 8: popup dashboard (activation scope UI) ---');
+        await admin.reload();
+        await sleep(600);
+        const popupState = await admin.evaluate(() => ({
+            status: document.getElementById('siteStatusBadge').textContent,
+            chips: Array.from(document.querySelectorAll('#hostChips .chip span')).map(s => s.textContent),
+            mode: document.querySelector('.seg-btn.active') && document.querySelector('.seg-btn.active').dataset.mode,
+            whitelistVisible: getComputedStyle(document.getElementById('whitelistArea')).display !== 'none',
+            badgeBtn: document.getElementById('btnToggleOverlay').textContent
+        }));
+        check(popupState.mode === 'whitelist', `popup reflects the active scope (${popupState.mode})`);
+        check(popupState.chips.includes('127.0.0.1') && popupState.chips.includes('example.com'),
+            `popup lists whitelisted hosts (${popupState.chips.join(', ')})`);
+        check(popupState.whitelistVisible, 'whitelist manager is visible in whitelist mode');
+
+        await admin.evaluate(() => {
+            document.getElementById('newHostInput').value = 'vimeo.com';
+            document.getElementById('btnAddHost').click();
+        });
+        await sleep(400);
+        let chips = await admin.$$eval('#hostChips .chip span', els => els.map(e => e.textContent));
+        check(chips.includes('vimeo.com'), 'adding a domain through the popup works');
+
+        await admin.evaluate(() => {
+            const chip = Array.from(document.querySelectorAll('#hostChips .chip'))
+                .find(c => c.textContent.includes('vimeo.com'));
+            chip.querySelector('button').click();
+        });
+        await sleep(400);
+        chips = await admin.$$eval('#hostChips .chip span', els => els.map(e => e.textContent));
+        check(!chips.includes('vimeo.com'), 'removing a domain through the popup works');
+
+        await admin.evaluate(() => document.getElementById('segAll').click());
+        await sleep(300);
+        const modeAfter = await admin.evaluate(() => new Promise(r => chrome.storage.local.get(['siteMode'], res => r(res.siteMode))));
+        check(modeAfter === 'all', `switching to "all sites" persists (${modeAfter})`);
+        await admin.evaluate(() => document.getElementById('segWhitelist').click());
+        await sleep(300);
+
+        check(adminErrors.length === 0, `no popup errors (${adminErrors.slice(0, 2).join(' | ') || 'clean'})`);
 
         console.log(`\n${failures === 0 ? '🏆 ALL TESTS PASSED' : `❌ ${failures} TEST(S) FAILED`}`);
     } catch (err) {
