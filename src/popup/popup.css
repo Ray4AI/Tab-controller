@@ -791,6 +791,58 @@ input[type="range"]:active::-webkit-slider-thumb {
 }
 
 /* Preset Buttons Inside Save Card */
+.auto-remember {
+    margin-bottom: 12px;
+}
+
+.auto-remember-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 7px;
+}
+
+.auto-remember-title {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #e5e7eb;
+    letter-spacing: 0.01em;
+}
+
+[data-theme='light'] .auto-remember-title {
+    color: #374151;
+}
+
+.auto-remember-title svg {
+    width: 12px;
+    height: 12px;
+    color: var(--save-title-small);
+}
+
+.auto-remember-hint {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    line-height: 1.3;
+}
+
+.seg-sm {
+    margin-bottom: 0;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+[data-theme='light'] .seg-sm {
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.seg-sm .seg-btn.active {
+    background: var(--save-title-small);
+    box-shadow: 0 2px 8px rgba(168, 85, 247, 0.25);
+}
+
 .btn-save {
     background: rgba(255, 255, 255, 0.05);
     color: #e5e7eb;

@@ -22,7 +22,7 @@
     if (window.__mediaControllerInjected) return;
     window.__mediaControllerInjected = true;
 
-    const MC_VERSION = '2.0';
+    const MC_VERSION = '2.1';
     const SPEED_SCALE = 100;
     const MAX_BOOST = 5.0;
     const MIN_VIDEO_W = 120;
@@ -139,6 +139,20 @@
         return host === e || host.endsWith('.' + e);
     }
 
+    // Page-visible state markers (attributes on <html>). They make "is the
+    // extension doing anything here?" answerable from devtools, and let the test
+    // suite prove that an unapproved page is never touched:
+    //   data-mc-active="2.1" → the extension is running on this page
+    //   data-mc-audio="1"    → Web Audio was hooked (only for a boost > 100 %,
+    //                          only ever for the primary element)
+    function markPageState() {
+        const el = document.documentElement;
+        if (!el) return;
+        if (state.enabled) el.setAttribute('data-mc-active', MC_VERSION);
+        else el.removeAttribute('data-mc-active');
+        if (state.audioContext) el.setAttribute('data-mc-audio', '1');
+    }
+
     function isSiteAllowed() {
         if (!settings.loaded) return false;
         if (settings.siteMode !== 'whitelist') return true;
@@ -180,6 +194,14 @@
     }
 
     // ── Audio graph ─────────────────────────────────────────────────────
+    //
+    // Nothing in here runs on a page the user has not approved. The only path to
+    // `new AudioContext()` / `createMediaElementSource()` is
+    //   activate() → refreshPrimary() → promote() → applyVolume() → routeViaGain()
+    // and every step of that chain is gated behind `state.enabled`, which is only
+    // true while `isSiteAllowed()` says so.
+
+    let interactionListenersAttached = false;
 
     function initAudio() {
         if (state.audioContext) return true;
@@ -195,6 +217,13 @@
             state.gainNode = null;
             return false;
         }
+        if (!interactionListenersAttached) {
+            interactionListenersAttached = true;
+            ['click', 'keydown', 'touchstart', 'pointerdown'].forEach(evt => {
+                document.addEventListener(evt, resumeAudioContext, { passive: true, capture: true });
+            });
+        }
+        markPageState();
         return true;
     }
 
@@ -203,10 +232,6 @@
             state.audioContext.resume().catch(() => { });
         }
     }
-
-    ['click', 'keydown', 'touchstart', 'pointerdown'].forEach(evt => {
-        document.addEventListener(evt, resumeAudioContext, { passive: true, capture: true });
-    });
 
     function setGain(value, smooth) {
         if (!state.gainNode || !state.audioContext) return;
@@ -1241,11 +1266,23 @@
     // ── Presets / persistence ───────────────────────────────────────────
 
     function persistState() {
-        chrome.runtime.sendMessage({
-            action: 'persistState',
-            volume: Math.round(state.currentVolume * 100),
-            speed: Math.round(state.currentSpeed * SPEED_SCALE)
-        }).catch(() => { });
+        // The background decides which preset layer records the change (explicit
+        // preset first, otherwise the auto-remember scope) and reports it back so
+        // the overlay can highlight the right lock button immediately.
+        try {
+            chrome.runtime.sendMessage({
+                action: 'persistState',
+                volume: Math.round(state.currentVolume * 100),
+                speed: Math.round(state.currentSpeed * SPEED_SCALE)
+            }, (response) => {
+                void chrome.runtime.lastError; // silence "no receiver" noise
+                if (!response || !response.mode) return;
+                if (response.mode !== state.activeMode) {
+                    state.activeMode = response.mode;
+                    syncOverlay();
+                }
+            });
+        } catch (e) { /* extension context is gone */ }
     }
 
     function setVolume(value) {
@@ -1273,7 +1310,7 @@
 
         chrome.runtime.sendMessage({ action: 'requestInitialState', domain: location.hostname }, (response) => {
             clearTimeout(safetyTimer);
-            if (!response) { settle(); return; }
+            if (!response || !state.enabled) { settle(); return; }
             if (response.mode !== undefined) state.activeMode = response.mode;
             if (response.volume !== undefined) state.currentVolume = response.volume / 100;
             if (response.speed !== undefined) state.currentSpeed = response.speed / SPEED_SCALE;
@@ -1400,6 +1437,7 @@
         startDomObserver();
         watchUrlChanges();
         startScans();
+        markPageState();
 
         refreshPrimary();
         fetchAndApplyPreset();
@@ -1412,6 +1450,7 @@
         if (state.primary) demote(state.primary);
         state.primary = null;
         destroyOverlay();
+        markPageState();
         if (fastScanTimer) { clearInterval(fastScanTimer); fastScanTimer = null; }
     }
 

@@ -133,6 +133,13 @@ server.listen(PORT, async () => {
             });
         }
 
+        const pageFlags = (p = page) => p.evaluate(() => ({
+            active: document.documentElement.getAttribute('data-mc-active'),
+            audio: document.documentElement.getAttribute('data-mc-audio'),
+            volume: document.querySelector('video') ? document.querySelector('video').volume : null,
+            rate: document.querySelector('video') ? document.querySelector('video').playbackRate : null
+        }));
+
         const videoMetrics = (p = page) => p.evaluate(() => {
             const out = {};
             document.querySelectorAll('video').forEach(v => {
@@ -233,27 +240,49 @@ server.listen(PORT, async () => {
             'badge position is remembered for the site');
 
         // ── TEST 5: whitelist gating ─────────────────────────────────────
-        console.log('\n--- TEST 5: whitelist gating ---');
+        console.log('\n--- TEST 5: whitelist gating (an unapproved page stays untouched) ---');
         await setStorage({ siteMode: 'whitelist', whitelist: ['example.com'] });
-        await sleep(800);
-        info = await badgeInfo();
-        check(info.count === 0, `no overlay on a non-whitelisted site (got ${info.count})`);
+        await sleep(500);
 
-        const blocked = await sendToTabs('127.0.0.1', { action: 'setVolume', value: 4.0 });
+        // Fresh page, never activated before → nothing may have happened at all.
+        const gated = await browser.newPage();
+        await gated.goto(ORIGIN + '/page2');
+        await gated.waitForSelector('video');
+        await sleep(2000);
+
+        let gatedInfo = await badgeInfo(gated);
+        check(gatedInfo.count === 0, `no overlay on a non-whitelisted site (got ${gatedInfo.count})`);
+
+        // The guarantee behind the question: no AudioContext, no MediaElementSource,
+        // no playback-rate/volume writes, no listeners, no observers.
+        let flags = await pageFlags(gated);
+        check(flags.active === null, `no data-mc-active marker (${flags.active})`);
+        check(flags.audio === null, `Web Audio was never hooked (${flags.audio})`);
+        check(Math.abs(flags.volume - 1) < 0.001 && Math.abs(flags.rate - 1) < 0.001,
+            `media element values untouched (volume ${flags.volume}, rate ${flags.rate})`);
+
+        const blocked = await sendToTabs('/page2', { action: 'setVolume', value: 4.0 });
         check(blocked && blocked.inactive === true, 'content script reports the site as inactive');
-        let blockedMetrics = await videoMetrics();
-        check(Math.abs(blockedMetrics.video1.rate - 1) < 0.01, 'media untouched while inactive');
-
-        await setStorage({ whitelist: ['example.com', '127.0.0.1'] });
-        await sleep(1200);
-        info = await badgeInfo();
-        check(info.count === 1, `overlay returns once the site is whitelisted (got ${info.count})`);
-
-        const allowed = await sendToTabs('127.0.0.1', { action: 'setVolume', value: 2.5 });
-        check(allowed && allowed.success === true, 'content script accepts settings again');
         await sleep(400);
-        info = await badgeInfo();
-        check(info.hosts[0].volume === '250%', `volume applied after whitelisting (${info.hosts[0].volume})`);
+        flags = await pageFlags(gated);
+        check(flags.audio === null && Math.abs(flags.volume - 1) < 0.001,
+            'still untouched after being told to boost');
+
+        // Approve it: the same live page must pick the setting up without a reload.
+        await setStorage({ whitelist: ['example.com', '127.0.0.1'] });
+        await sleep(1500);
+        gatedInfo = await badgeInfo(gated);
+        check(gatedInfo.count === 1, `overlay appears on the live page once whitelisted (got ${gatedInfo.count})`);
+
+        const allowed = await sendToTabs('/page2', { action: 'setVolume', value: 2.5 });
+        check(allowed && allowed.success === true, 'content script accepts settings again');
+        await sleep(500);
+        gatedInfo = await badgeInfo(gated);
+        check(gatedInfo.hosts[0].volume === '250%', `volume applied after whitelisting (${gatedInfo.hosts[0].volume})`);
+
+        flags = await pageFlags(gated);
+        check(flags.active !== null, `data-mc-active marker appears once approved (${flags.active})`);
+        check(flags.audio === '1', 'Web Audio is hooked only after a boost on an approved site');
 
         // ── TEST 6: hiding the badge ─────────────────────────────────────
         console.log('\n--- TEST 6: badges can be hidden entirely ---');
@@ -329,6 +358,53 @@ server.listen(PORT, async () => {
         await sleep(300);
 
         check(adminErrors.length === 0, `no popup errors (${adminErrors.slice(0, 2).join(' | ') || 'clean'})`);
+
+        // ── TEST 9: auto-remember per site ───────────────────────────────
+        console.log('\n--- TEST 9: auto-remember a site without pressing any lock ---');
+        await admin.evaluate(() => new Promise((resolve) => {
+            chrome.storage.local.get(null, (all) => {
+                const stale = Object.keys(all).filter(k => k.startsWith('saved_') || k.startsWith('tab_'));
+                chrome.storage.local.remove(stale.concat(['autoRemember']), () => resolve());
+            });
+        }));
+        await sleep(300);
+
+        // No preset of any kind exists now: without auto-remember a new tab would
+        // reset to 100 %, which is the annoyance this feature removes.
+        await page.goto(ORIGIN + '/');
+        await page.waitForSelector('#video1');
+        await sleep(1800);
+        await sendToTabs('127.0.0.1', { action: 'setVolume', value: 4.2 });
+        await sendToTabs('127.0.0.1', { action: 'setSpeed', value: 1.25 });
+        await sleep(700);
+
+        const remembered = await admin.evaluate(() => new Promise(r => chrome.storage.local.get(null, r)));
+        const domainKey = Object.keys(remembered).find(k => k.startsWith('saved_domain_'));
+        check(!!domainKey && remembered[domainKey].volume === 420 && remembered[domainKey].speed === 125,
+            `adjusting the sliders auto-saved the site (${domainKey}: ${JSON.stringify(remembered[domainKey])})`);
+
+        // A brand new tab of the same site must adopt the remembered values.
+        const freshTab = await browser.newPage();
+        await freshTab.goto(ORIGIN + '/page2');
+        await freshTab.waitForSelector('video');
+        await sleep(2500);
+        const freshInfo = await badgeInfo(freshTab);
+        check(freshInfo.hosts[0] && freshInfo.hosts[0].volume === '420%' && freshInfo.hosts[0].speed === '1.25x',
+            `new tab reopened with the remembered settings (${freshInfo.hosts[0] && freshInfo.hosts[0].volume} / ${freshInfo.hosts[0] && freshInfo.hosts[0].speed})`);
+
+        // Switching auto-remember off must restore the temporary behaviour.
+        await admin.evaluate(() => new Promise(r => chrome.storage.local.set({ autoRemember: 'off' }, r)));
+        await admin.evaluate(() => new Promise((resolve) => {
+            chrome.storage.local.get(null, (all) => {
+                chrome.storage.local.remove(Object.keys(all).filter(k => k.startsWith('saved_')), () => resolve());
+            });
+        }));
+        await sleep(400);
+        await sendToTabs('127.0.0.1', { action: 'setVolume', value: 3.1 });
+        await sleep(700);
+        const offState = await admin.evaluate(() => new Promise(r => chrome.storage.local.get(null, r)));
+        check(!Object.keys(offState).some(k => k.startsWith('saved_')),
+            'auto-remember Off keeps settings temporary again');
 
         console.log(`\n${failures === 0 ? '🏆 ALL TESTS PASSED' : `❌ ${failures} TEST(S) FAILED`}`);
     } catch (err) {

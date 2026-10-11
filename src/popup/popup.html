@@ -19,7 +19,7 @@
             </div>
             <div class="header-text">
                 <h1>Media Booster</h1>
-                <p>Tab Media Control v2.0</p>
+                <p>Tab Media Control v2.1</p>
             </div>
         </div>
         <label class="theme-switch" title="Toggle Dark/Light Mode">
@@ -145,6 +145,27 @@
             <span class="status-dot"></span>
             <span id="saveInfo" class="save-info">Settings reset to default for new videos.</span>
         </div>
+
+        <!-- Auto-remember: the hands-free version of the preset system -->
+        <div class="auto-remember">
+            <div class="auto-remember-head">
+                <span class="auto-remember-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
+                        <path d="M3 3v5h5"></path>
+                    </svg>
+                    Auto-remember
+                </span>
+                <span class="auto-remember-hint" id="autoHint">New tabs of this site reopen with the same volume.</span>
+            </div>
+            <div class="seg seg-sm" id="autoSeg" role="group" aria-label="Auto remember scope">
+                <button class="seg-btn" data-auto="off">Off</button>
+                <button class="seg-btn" data-auto="domain">This site</button>
+                <button class="seg-btn" data-auto="global">Everywhere</button>
+            </div>
+        </div>
+
         <div class="controls">
             <button class="btn-action btn-save" id="btnSaveTab">Tab</button>
             <button class="btn-action btn-save" id="btnSaveDomain">Domain</button>

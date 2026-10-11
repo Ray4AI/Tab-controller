@@ -49,6 +49,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnToggleOverlay = document.getElementById('btnToggleOverlay');
     const btnResetBadge = document.getElementById('btnResetBadge');
 
+    const autoSeg = document.getElementById('autoSeg');
+    const autoHint = document.getElementById('autoHint');
+
+    // ── Auto-remember scope ─────────────────────────────────────────────
+    const AUTO_HINTS = {
+        off: 'Settings stay temporary — every new video starts at 100%.',
+        domain: 'New tabs of this site reopen with the same volume & speed.',
+        global: 'Every site you adjust is remembered everywhere.'
+    };
+
+    function renderAuto(value) {
+        const mode = AUTO_HINTS[value] ? value : 'domain';
+        autoSeg.querySelectorAll('.seg-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.auto === mode);
+        });
+        autoHint.textContent = AUTO_HINTS[mode];
+    }
+
+    autoSeg.addEventListener('click', (e) => {
+        const btn = e.target.closest('.seg-btn');
+        if (!btn) return;
+        const value = btn.dataset.auto;
+        renderAuto(value);
+        chrome.storage.local.set({ autoRemember: value });
+    });
+
     // ── Site scope helpers ──────────────────────────────────────────────
     function normalizeHost(value) {
         return String(value || '')
@@ -272,10 +298,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Boot ────────────────────────────────────────────────────────────
-    chrome.storage.local.get(['siteMode', 'whitelist', 'showOverlay'], (result) => {
+    chrome.storage.local.get(['siteMode', 'whitelist', 'showOverlay', 'autoRemember'], (result) => {
         scope.siteMode = result.siteMode || 'whitelist';
         scope.whitelist = Array.isArray(result.whitelist) ? result.whitelist : [];
         scope.showOverlay = result.showOverlay !== false;
+        renderAuto(result.autoRemember || 'domain');
         renderScope();
     });
 
@@ -390,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     saveStatusBadge.textContent = 'NO PRESET';
                     saveStatusBadge.className = 'save-badge save-badge--none';
-                    saveInfo.textContent = 'Settings reset to default for new videos.';
+                    saveInfo.textContent = 'Adjusting a slider saves it for this site automatically.';
                 }
             });
         }

@@ -22,11 +22,12 @@ const DEFAULT_WHITELIST = [
 // Seed the default activation scope on install/update. Existing user values are
 // never touched.
 chrome.runtime.onInstalled.addListener(() => {
-    chrome.storage.local.get(['siteMode', 'whitelist', 'showOverlay'], (result) => {
+    chrome.storage.local.get(['siteMode', 'whitelist', 'showOverlay', 'autoRemember'], (result) => {
         const updates = {};
         if (!result.siteMode) updates.siteMode = 'whitelist';
         if (!Array.isArray(result.whitelist)) updates.whitelist = DEFAULT_WHITELIST;
         if (typeof result.showOverlay !== 'boolean') updates.showOverlay = true;
+        if (!result.autoRemember) updates.autoRemember = 'domain';
         if (Object.keys(updates).length) chrome.storage.local.set(updates);
     });
 });
@@ -54,7 +55,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const globalKey = 'saved_global';
 
         // Single read, then single write — avoids race conditions
-        chrome.storage.local.get([tabKey, domainKey, globalKey], (result) => {
+        chrome.storage.local.get([tabKey, domainKey, globalKey, 'autoRemember'], (result) => {
             const payload = {
                 volume: message.volume !== undefined ? message.volume : 100,
                 speed: message.speed !== undefined ? message.speed : 100
@@ -64,12 +65,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (message.volume !== undefined) updates[`tab_volume_${tabId}`] = message.volume;
             if (message.speed !== undefined) updates[`tab_speed_${tabId}`] = message.speed;
 
-            // Sync the active preset in one atomic write
-            if (result[tabKey])              updates[tabKey] = payload;
-            else if (domain && result[domainKey]) updates[domainKey] = payload;
-            else if (result[globalKey])      updates[globalKey] = payload;
+            // Decide which preset layer records this change.
+            //   1. an explicitly saved preset always wins,
+            //   2. otherwise the auto-remember scope decides (off / this site / everywhere).
+            const auto = result.autoRemember || 'domain';
+            let mode = 'none';
+            if (result[tabKey]) mode = 'tab';
+            else if (domain && result[domainKey]) mode = 'domain';
+            else if (result[globalKey]) mode = 'global';
 
-            chrome.storage.local.set(updates, () => sendResponse({ success: true }));
+            if (auto === 'global') {
+                // "Everywhere" never keeps a per-site layer around.
+                mode = 'global';
+            } else if (auto === 'domain' && domain && mode !== 'tab') {
+                // "This site" promotes a global preset to a per-site one so a new
+                // tab of this site reuses exactly these values.
+                mode = 'domain';
+            }
+
+            if (mode === 'tab') updates[tabKey] = payload;
+            else if (mode === 'domain') updates[domainKey] = payload;
+            else if (mode === 'global') updates[globalKey] = payload;
+
+            chrome.storage.local.set(updates, () => sendResponse({ success: true, mode }));
         });
         return true;
     }

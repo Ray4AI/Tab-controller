@@ -21,6 +21,7 @@ addons.mozilla.org for signing, then hand the signed file to your users.
 | **Web Audio** | Every `<video>`/`<audio>` on the page was permanently routed through a gain node. | Web Audio is hooked **lazily**, only for the primary element, and only when a boost above 100 % is actually requested. At 100 % the extension is completely passive. |
 | **The floating badge** | Clamped inside the player rectangle — it always covered part of the video. | Can be **dragged anywhere on the screen**, including outside the player. The position is remembered per site; double-click the badge (or use the popup) to snap it back. |
 | **Where it runs** | Every website, all the time. | **Whitelist scope**: only the sites you list. Manage it from the popup (add/remove sites, or switch to "All sites"). |
+| **Remembering your settings** | Temporary by default: every new tab/video went back to 100 % until you clicked the `D` lock. | **Auto-remember** (on by default, scope *This site*): the moment you change the volume/speed it is stored for that site, so **every new tab of that site reopens with your values**. Switchable to *Off* / *This site* / *Everywhere*. |
 | **Badge visibility** | Always on. | Can be switched off entirely from the popup while keeping the keyboard/popup controls. |
 
 ---
@@ -67,7 +68,20 @@ The extension now runs **only on whitelisted sites** by default. Open the toolba
 When a site is not allowed the content script does nothing at all: no badge, no audio routing,
 no playback-rate changes.
 
-### 2. The video overlay (quick controls)
+### 2. What happens on a site that is *not* allowed
+
+Nothing at all. The content script bails out before it does any work:
+
+* no `<video>`/`<audio>` is read or modified (element `volume`/`playbackRate` stay untouched),
+* no `AudioContext` is constructed and no `MediaElementSource` is created — the page's audio
+  pipeline is exactly what it was,
+* no overlay, no `MutationObserver`, no timers, no event listeners are added.
+
+You can verify it yourself in devtools: the `<html>` element only carries `data-mc-active`
+(the extension is running on this page) and `data-mc-audio="1"` (Web Audio was hooked because
+you asked for a boost above 100 % *here*). On a non-whitelisted page both attributes are absent.
+
+### 3. The video overlay (quick controls)
 
 A small badge is attached to the **primary video** — the largest visible video of the page.
 Hover previews, ads and background clips never get one.
@@ -81,26 +95,34 @@ Hover previews, ads and background clips never get one.
   another part of the page. **Double-click** the badge to snap it back onto the player.
   The position is saved per site.
 
-### 3. The full dashboard (popup)
+### 4. The full dashboard (popup)
 
 Volume + speed sliders, activation scope, badge visibility, theme switch and the preset
 manager.
 
-### 4. Preset memory
+### 5. Preset memory
 
-Speeds/volumes are temporary unless saved:
+**Auto-remember (default: This site)**
+Just move the volume or speed slider once and it is stored for that site — a new tab of the same
+site opens with exactly those values, no locking required. Switch it in the popup:
 
-1. **[T] Tab** — this tab only (.e.g a tab you keep open for a long video).
-2. **[D] Domain** — every page of that site.
+* **Off** — settings stay temporary (classic behaviour, new videos reset to 100 %).
+* **This site** — remember per domain (recommended).
+* **Everywhere** — remember one setting for every site.
+
+Explicit presets still work exactly as before, and they take priority over auto-remember:
+
+1. **[T] Tab** — this tab only (e.g. a tab you keep open for a long video).
+2. **[D] Domain** — every page of that site (this is also what auto-remember creates).
 3. **[G] Global** — every site.
 4. **[✕] / "Reset to Default"** — clears the highest-priority layer, falling back to the next
    one (Tab → Domain → Global → default).
 
-Without any preset ("default mode") the extension resets the primary video to 1.0x / 100 %
-when a **new clip** starts loading in the *same* player element. Preview clips and other
-secondary media never trigger that reset.
+Without any preset ("Off") the extension resets the primary video to 1.0x / 100 % when a **new
+clip** starts loading in the *same* player element. Preview clips and other secondary media
+never trigger that reset.
 
-### 5. YouTube synchronisation
+### 6. YouTube synchronisation
 
 If you change the speed with YouTube's own gear icon or shortcuts, the extension adopts the new
 value instead of fighting it (primary video only).
