@@ -1,6 +1,6 @@
 {
   "name": "media-extensions",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Boost volume up to 500% and playback speed up to 16x for individual tabs, only on the sites you allow.",
   "main": "index.js",
   "devDependencies": {

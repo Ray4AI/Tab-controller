@@ -22,7 +22,10 @@ addons.mozilla.org for signing, then hand the signed file to your users.
 | **The floating badge** | Clamped inside the player rectangle — it always covered part of the video. | Can be **dragged anywhere on the screen**, including outside the player. The position is remembered per site; double-click the badge (or use the popup) to snap it back. |
 | **Where it runs** | Every website, all the time. | **Whitelist scope**: only the sites you list. Manage it from the popup (add/remove sites, or switch to "All sites"). |
 | **Remembering your settings** | Temporary by default: every new tab/video went back to 100 % until you clicked the `D` lock. | **Auto-remember** (on by default, scope *This site*): the moment you change the volume/speed it is stored for that site, so **every new tab of that site reopens with your values**. Switchable to *Off* / *This site* / *Everywhere*. |
-| **Badge visibility** | Always on. | Can be switched off entirely from the popup while keeping the keyboard/popup controls. |
+| **Badge visibility** | Always on. | Can be switched off entirely from the popup. |
+| **Overlay layout** | One floating pill only. | Two layouts, switchable live: **Floating** (draggable anywhere) or **Side rail** — a slim vertical strip fused to the player's right edge that opens on hover. |
+| **Idle clutter** | The badge always sat on top of the video. | **Auto-hide**: after 3 s of pointer stillness the badge fades away (or the rail slides off the edge); any mouse movement brings it back. |
+| **Wheel granularity** | Fixed 5 % per wheel notch. | Configurable: 5 / 10 / 25 / 50 (volume) and 0.05x / 0.1x / 0.25x / 0.5x (speed). |
 
 ---
 
@@ -94,13 +97,34 @@ Hover previews, ads and background clips never get one.
 * **Drag handle (⣿)** — drag it anywhere: on the player, in the empty space beside it, or on
   another part of the page. **Double-click** the badge to snap it back onto the player.
   The position is saved per site.
+* **Wheel** — scrolling over the speed or volume chip steps by the granularity configured in
+  the popup (5 / 10 / 25 / 50 % for volume, 0.05x / 0.1x / 0.25x / 0.5x for speed). The `+`/`−`
+  buttons always keep the fine 0.05x step.
 
-### 4. The full dashboard (popup)
+### 4. Overlay layout, auto-hide and wheel step
 
-Volume + speed sliders, activation scope, badge visibility, theme switch and the preset
-manager.
+Everything is configurable in the popup's **Overlay & wheel** card and applies immediately to
+open tabs:
 
-### 5. Preset memory
+* **Layout — Floating**: the classic badge you can drag anywhere (including outside the player).
+* **Layout — Side rail**: a compact vertical strip fused to the player's right edge and centred
+  vertically. Hovering it slides it open into the full horizontal badge; the popovers are
+  right-aligned so nothing can fall off the screen. A player too small for the rail falls back
+  to the floating badge automatically.
+* **Auto-hide (default on)**: after 3 seconds without pointer movement the overlay fades out
+  (floating) or slides off the player edge leaving an 8 px sliver (rail). Any mouse movement —
+  or approaching the player edge — brings it straight back. Perfect for fullscreen.
+
+  *Tip:* in fullscreen the rail is the cleanest option: it never covers the picture and gets
+  out of the way on its own.
+* **Wheel step**: how much one wheel notch on the volume/speed chip changes.
+
+### 5. The full dashboard (popup)
+
+Volume + speed sliders, activation scope, overlay layout & wheel step, badge visibility, theme
+switch and the preset manager.
+
+### 6. Preset memory
 
 **Auto-remember (default: This site)**
 Just move the volume or speed slider once and it is stored for that site — a new tab of the same
@@ -122,7 +146,7 @@ Without any preset ("Off") the extension resets the primary video to 1.0x / 100 
 clip** starts loading in the *same* player element. Preview clips and other secondary media
 never trigger that reset.
 
-### 6. YouTube synchronisation
+### 7. YouTube synchronisation
 
 If you change the speed with YouTube's own gear icon or shortcuts, the extension adopts the new
 value instead of fighting it (primary video only).

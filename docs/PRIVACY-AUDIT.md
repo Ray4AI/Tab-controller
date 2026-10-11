@@ -1,10 +1,10 @@
-# Privacy audit — Media Controller v2.2
+# Privacy audit — Media Controller v2.3
 
 Short version: **the extension has no telemetry, no analytics, no network requests and no
 remote code.** Everything it knows stays inside `chrome.storage.local` in your own browser
 profile. This document records how that was verified so you can re-run the checks yourself.
 
-Audited revision: `main` @ v2.2 · scope: everything that ships inside the `.xpi`
+Audited revision: `main` @ v2.3 · scope: everything that ships inside the `.xpi`
 (which includes this file and the README).
 
 ---
@@ -22,7 +22,7 @@ grep -rnoE "https?://[^\"' )]+" src/ manifest.json
 grep -rhoE "chrome\.[a-zA-Z]+(\.[a-zA-Z]+)?" src/ | sort | uniq -c
 
 # 4. what the package really contains
-unzip -l dist/media-controller-2.2.xpi
+unzip -l dist/media-controller-2.3.xpi
 
 # 5. PNG metadata (ImageMagick timestamps only)
 python3 - <<'PY'
@@ -93,7 +93,7 @@ extension itself never performs a request. Consequences worth knowing:
 
 The upstream repository ([Zafkiel-dal/Tab-controller](https://github.com/Zafkiel-dal/Tab-controller))
 has the same clean bill of health: `git grep` for network APIs in its `src/` returns nothing and
-its permission set is identical. v2.2 additionally *reduces* surface area:
+its permission set is identical. v2.3 additionally *reduces* surface area:
 
 * Web Audio is no longer hooked for every media element on every page — only for the primary
   element, only on sites you approved, and only when you actually ask for a boost above 100 %,

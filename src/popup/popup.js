@@ -52,6 +52,59 @@ document.addEventListener('DOMContentLoaded', () => {
     const autoSeg = document.getElementById('autoSeg');
     const autoHint = document.getElementById('autoHint');
 
+    const styleSeg = document.getElementById('styleSeg');
+    const autoHideSeg = document.getElementById('autoHideSeg');
+    const volStepSeg = document.getElementById('volStepSeg');
+    const speedStepSeg = document.getElementById('speedStepSeg');
+    const overlayStyleBadge = document.getElementById('overlayStyleBadge');
+
+    // ── Overlay layout / wheel granularity ──────────────────────────────
+    const overlay = {
+        overlayStyle: 'pill',
+        autoHide: true,
+        wheelVolumeStep: 5,
+        wheelSpeedStep: 5
+    };
+
+    function segSelect(seg, attr, value) {
+        seg.querySelectorAll('.seg-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset[attr] === String(value));
+        });
+    }
+
+    function renderOverlay() {
+        const strip = overlay.overlayStyle === 'strip';
+        segSelect(styleSeg, 'style', overlay.overlayStyle);
+        segSelect(autoHideSeg, 'autohide', overlay.autoHide ? 'on' : 'off');
+        segSelect(volStepSeg, 'step', overlay.wheelVolumeStep);
+        segSelect(speedStepSeg, 'step', overlay.wheelSpeedStep);
+        overlayStyleBadge.textContent = strip ? 'SIDE RAIL' : 'FLOATING';
+        overlayStyleBadge.className = 'save-badge ' + (strip ? 'save-badge--on' : 'save-badge--none');
+    }
+
+    function saveOverlay(updates) {
+        Object.assign(overlay, updates);
+        renderOverlay();
+        chrome.storage.local.set(updates);
+    }
+
+    styleSeg.addEventListener('click', (e) => {
+        const btn = e.target.closest('.seg-btn');
+        if (btn) saveOverlay({ overlayStyle: btn.dataset.style });
+    });
+    autoHideSeg.addEventListener('click', (e) => {
+        const btn = e.target.closest('.seg-btn');
+        if (btn) saveOverlay({ autoHide: btn.dataset.autohide === 'on' });
+    });
+    volStepSeg.addEventListener('click', (e) => {
+        const btn = e.target.closest('.seg-btn');
+        if (btn) saveOverlay({ wheelVolumeStep: Number(btn.dataset.step) });
+    });
+    speedStepSeg.addEventListener('click', (e) => {
+        const btn = e.target.closest('.seg-btn');
+        if (btn) saveOverlay({ wheelSpeedStep: Number(btn.dataset.step) });
+    });
+
     // ── Auto-remember scope ─────────────────────────────────────────────
     const AUTO_HINTS = {
         off: 'Settings stay temporary — every new video starts at 100%.',
@@ -298,11 +351,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Boot ────────────────────────────────────────────────────────────
-    chrome.storage.local.get(['siteMode', 'whitelist', 'showOverlay', 'autoRemember'], (result) => {
+    chrome.storage.local.get([
+        'siteMode', 'whitelist', 'showOverlay', 'autoRemember',
+        'overlayStyle', 'autoHide', 'wheelVolumeStep', 'wheelSpeedStep'
+    ], (result) => {
         scope.siteMode = result.siteMode || 'whitelist';
         scope.whitelist = Array.isArray(result.whitelist) ? result.whitelist : [];
         scope.showOverlay = result.showOverlay !== false;
+        overlay.overlayStyle = result.overlayStyle === 'strip' ? 'strip' : 'pill';
+        overlay.autoHide = result.autoHide !== false;
+        overlay.wheelVolumeStep = Number(result.wheelVolumeStep) || 5;
+        overlay.wheelSpeedStep = Number(result.wheelSpeedStep) || 5;
         renderAuto(result.autoRemember || 'domain');
+        renderOverlay();
         renderScope();
     });
 

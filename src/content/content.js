@@ -22,7 +22,7 @@
     if (window.__mediaControllerInjected) return;
     window.__mediaControllerInjected = true;
 
-    const MC_VERSION = '2.2';
+    const MC_VERSION = '2.3';
     const SPEED_SCALE = 100;
     const MAX_BOOST = 5.0;
     const MIN_VIDEO_W = 120;
@@ -56,8 +56,17 @@
         loaded: false,
         siteMode: 'whitelist',   // 'whitelist' | 'all'
         whitelist: DEFAULT_WHITELIST.slice(),
-        showOverlay: true
+        showOverlay: true,
+        overlayStyle: 'pill',    // 'pill'  = floating badge, 'strip' = rail fused to the player edge
+        autoHide: true,          // fade/slide away while the pointer is idle
+        wheelVolumeStep: 5,      // volume percentage points per wheel notch
+        wheelSpeedStep: 5        // speed percentage points (5 → 0.05x) per wheel notch
     };
+
+    const WHEEL_STEPS = [1, 5, 10, 25, 50];
+    const STRIP_PEEK = 8;        // px of the rail that stays visible when auto-hidden
+    const STRIP_REVEAL_ZONE = 80; // px from the player edge that reveals the rail
+    const IDLE_HIDE_MS = 3000;
 
     const state = {
         enabled: false,
@@ -163,7 +172,11 @@
 
     function loadSettings() {
         return new Promise(resolve => {
-            const keys = ['siteMode', 'whitelist', 'showOverlay', `overlay_pos_${normalizeHost(location.hostname)}`];
+            const keys = [
+                'siteMode', 'whitelist', 'showOverlay', 'overlayStyle', 'autoHide',
+                'wheelVolumeStep', 'wheelSpeedStep',
+                `overlay_pos_${normalizeHost(location.hostname)}`
+            ];
             const done = () => {
                 settings.loaded = true;
                 resolve();
@@ -173,6 +186,14 @@
                     if (result && result.siteMode) settings.siteMode = result.siteMode;
                     if (result && Array.isArray(result.whitelist)) settings.whitelist = result.whitelist;
                     if (result && typeof result.showOverlay === 'boolean') settings.showOverlay = result.showOverlay;
+                    if (result && result.overlayStyle === 'strip') settings.overlayStyle = 'strip';
+                    if (result && typeof result.autoHide === 'boolean') settings.autoHide = result.autoHide;
+                    if (result && WHEEL_STEPS.includes(Number(result.wheelVolumeStep))) {
+                        settings.wheelVolumeStep = Number(result.wheelVolumeStep);
+                    }
+                    if (result && WHEEL_STEPS.includes(Number(result.wheelSpeedStep))) {
+                        settings.wheelSpeedStep = Number(result.wheelSpeedStep);
+                    }
                     const saved = result && result[`overlay_pos_${normalizeHost(location.hostname)}`];
                     if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
                         state.badgeOffset = { x: saved.x, y: saved.y };
@@ -324,7 +345,8 @@
                 user-select: none;
                 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
                 opacity: var(--mc-idle-opacity, 0.45);
-                transition: opacity 0.3s ease, background 0.3s ease;
+                transition: opacity 0.3s ease, background 0.3s ease,
+                            transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
                 pointer-events: auto;
                 -webkit-tap-highlight-color: transparent;
                 touch-action: none;
@@ -335,6 +357,51 @@
                 opacity: 1 !important;
                 background: rgba(15, 15, 20, 0.88);
                 box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+            }
+
+            /* Auto-hide: the badge fades out and stops receiving events until the
+               pointer moves again (used for both layouts). */
+            .mc-badge.mc-hushed {
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+
+            /* Side rail: a compact vertical strip fused to the player's edge.
+               Popovers stay disabled until it slides open, so nothing is ever
+               rendered sideways. */
+            .mc-badge.mc-strip:not(.mc-strip-open) .mc-zone > .mc-spd-pop,
+            .mc-badge.mc-strip:not(.mc-strip-open) .mc-zone > .mc-vol-pop,
+            .mc-badge.mc-strip:not(.mc-strip-open) .mc-zone > .mc-eye-pop,
+            .mc-badge.mc-strip:not(.mc-strip-open) .mc-zone > .mc-save-pop {
+                display: none !important;
+            }
+
+            .mc-badge.mc-strip-open {
+                background: rgba(15, 15, 20, 0.9);
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+            }
+
+            /* The opened rail sits against the player's right edge, so its
+               popovers are right-aligned instead of centred — otherwise the
+               right-most chip would push its slider off the screen. */
+            .mc-badge.mc-strip-open .mc-spd-pop,
+            .mc-badge.mc-strip-open .mc-vol-pop,
+            .mc-badge.mc-strip-open .mc-eye-pop,
+            .mc-badge.mc-strip-open .mc-save-pop {
+                left: auto;
+                right: 0;
+                transform: translateX(0) scale(0.95);
+            }
+
+            .mc-badge.mc-strip-open .mc-zone:hover > .mc-spd-pop,
+            .mc-badge.mc-strip-open .mc-zone:hover > .mc-vol-pop,
+            .mc-badge.mc-strip-open .mc-zone:hover > .mc-eye-pop,
+            .mc-badge.mc-strip-open .mc-zone:hover > .mc-save-pop,
+            .mc-badge.mc-strip-open .mc-zone.mc-open > .mc-spd-pop,
+            .mc-badge.mc-strip-open .mc-zone.mc-open > .mc-vol-pop,
+            .mc-badge.mc-strip-open .mc-zone.mc-open > .mc-eye-pop,
+            .mc-badge.mc-strip-open .mc-zone.mc-open > .mc-save-pop {
+                transform: translateX(0) scale(1);
             }
 
             .mc-badge.mc-dragging {
@@ -669,9 +736,9 @@
         btnClr.onclick = (e) => { e.stopPropagation(); setOverlayMode('clear'); };
 
         // ── Speed controls ──
-        function stepSpeed(direction) {
+        function stepSpeed(direction, stepOverride) {
             const curr = Math.round(state.currentSpeed * 100);
-            const step = 5;
+            const step = Number.isFinite(stepOverride) ? stepOverride : 5;
             const next = direction > 0 ? Math.min(1600, curr + step) : Math.max(10, curr - step);
             setSpeed(next / 100);
         }
@@ -681,7 +748,7 @@
         speedZone.addEventListener('wheel', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            stepSpeed(e.deltaY < 0 ? 1 : -1);
+            stepSpeed(e.deltaY < 0 ? 1 : -1, settings.wheelSpeedStep);
         }, { passive: false });
 
         // ── Volume controls ──
@@ -695,7 +762,7 @@
         volZone.addEventListener('wheel', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const step = e.deltaY < 0 ? 5 : -5;
+            const step = (e.deltaY < 0 ? 1 : -1) * settings.wheelVolumeStep;
             const next = clamp(Math.round(state.currentVolume * 100) + step, 0, MAX_BOOST * 100);
             setVolume(next / 100);
         }, { passive: false });
@@ -803,9 +870,50 @@
             };
         }
 
+        // Two layouts are supported:
+        //   'pill'  → the classic draggable badge (left/top + no transform)
+        //   'strip' → a vertical rail fused to the player's right edge. Its box is
+        //             pinned once per resize and everything else is a transform, so
+        //             scrolling never lags and open/close stays smooth.
+        let hushed = false;          // auto-hidden
+        let stripOpen = false;       // rail expanded into the full horizontal badge
+        let idleTimer = null;
+        let collapseTimer = null;
+        let pointerDownInside = false;
+        let lastTimerReset = 0;
+
+        // Cached player rect: `pointermove` fires constantly, so it must never
+        // force a synchronous layout. positionHost() refreshes this.
+        let hostRectCache = { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+
+        function usingStrip(rect) {
+            if (settings.overlayStyle !== 'strip') return false;
+            const r = rect || hostRectCache;
+            // Not enough room for a vertical rail? Fall back to the pill.
+            return r.width >= 90 && r.height >= Math.max(badge.offsetWidth, 160);
+        }
+
         function layoutBadge() {
             if (dragging || !badge.offsetWidth || host.style.display === 'none') return;
             const hostRect = host.getBoundingClientRect();
+            hostRectCache = hostRect;
+
+            if (usingStrip(hostRect)) {
+                const bw = badge.offsetWidth;
+                const bh = badge.offsetHeight;
+                const visualW = stripOpen ? bw : bh;
+                // Visual centre: flush against the player's right edge, vertically centred.
+                const cx = hostRect.width - visualW / 2;
+                const cy = hostRect.height / 2;
+                badge.style.left = Math.round(cx - bw / 2) + 'px';
+                badge.style.top = Math.round(cy - bh / 2) + 'px';
+                const slide = stripOpen || !hushed ? 0 : Math.max(0, bh - STRIP_PEEK);
+                badge.style.transform = stripOpen
+                    ? `translateX(${slide}px) rotate(0deg)`
+                    : `translateX(${slide}px) rotate(90deg)`;
+                return;
+            }
+
             let x;
             let y;
             if (state.badgeOffset) {
@@ -820,6 +928,93 @@
             badge.style.left = pos.x + 'px';
             badge.style.top = pos.y + 'px';
         }
+
+        // ── Auto-hide / reveal ──
+        function setHushed(value) {
+            if (hushed === value) return;
+            hushed = value;
+            if (hushed) {
+                stripOpen = false;
+                badge.classList.remove('mc-strip-open');
+                closeAllPops(null);
+            }
+            badge.classList.toggle('mc-hushed', hushed);
+            layoutBadge();
+        }
+
+        function scheduleIdleHide() {
+            clearTimeout(idleTimer);
+            if (!settings.autoHide) return;
+            idleTimer = setTimeout(() => {
+                if (dragging || pointerDownInside) { scheduleIdleHide(); return; }
+                if (badge.matches(':hover')) { scheduleIdleHide(); return; }
+                setHushed(true);
+            }, IDLE_HIDE_MS);
+        }
+
+        function reveal() {
+            if (hushed) setHushed(false);
+            const now = Date.now();
+            if (now - lastTimerReset > 1000) {
+                lastTimerReset = now;
+                scheduleIdleHide();
+            }
+        }
+
+        const onPointerMove = () => {
+            // Both layouts behave the same: any pointer activity brings the UI
+            // back, and it slips away again after IDLE_HIDE_MS of stillness.
+            reveal();
+        };
+
+        // Approaching the player's edge also counts, so a resting pointer next to
+        // the rail keeps it out (the idle timer would otherwise hide it).
+        const onPointerNearEdge = (e) => {
+            if (!usingStrip() || stripOpen) return;
+            const r = hostRectCache;
+            if (e.clientX > r.right - STRIP_REVEAL_ZONE &&
+                e.clientY > r.top - 40 && e.clientY < r.bottom + 40) {
+                lastTimerReset = Date.now();
+                scheduleIdleHide();
+            }
+        };
+
+        function openStrip() {
+            if (usingStrip() && !stripOpen && !hushed) {
+                clearTimeout(collapseTimer);
+                stripOpen = true;
+                badge.classList.add('mc-strip-open');
+                layoutBadge();
+            }
+        }
+
+        function scheduleCollapse() {
+            if (!usingStrip()) return;
+            clearTimeout(collapseTimer);
+            collapseTimer = setTimeout(() => {
+                if (badge.matches(':hover') || dragging || pointerDownInside) return;
+                stripOpen = false;
+                badge.classList.remove('mc-strip-open');
+                layoutBadge();
+            }, 400);
+        }
+
+        badge.addEventListener('pointerenter', () => {
+            clearTimeout(collapseTimer);
+            reveal();
+            openStrip();
+        });
+        badge.addEventListener('pointerleave', () => {
+            scheduleCollapse();
+            scheduleIdleHide();
+        });
+        badge.addEventListener('pointerdown', () => { pointerDownInside = true; });
+        ['pointerup', 'pointercancel'].forEach(evt => {
+            badge.addEventListener(evt, () => {
+                pointerDownInside = false;
+                scheduleIdleHide();
+            });
+        });
 
         // ── Drag ──
         let dragStartX = 0;
@@ -879,6 +1074,7 @@
 
         badge.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (usingStrip()) return; // the rail is docked, dragging is a pill-mode thing
             if (!canStartDragFromTarget(e.target)) return;
             e.stopPropagation();
             if (badge.setPointerCapture) {
@@ -911,6 +1107,10 @@
                 host.style.top = '0px';
                 host.style.width = window.innerWidth + 'px';
                 host.style.height = window.innerHeight + 'px';
+                hostRectCache = {
+                    left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight,
+                    width: window.innerWidth, height: window.innerHeight
+                };
                 layoutBadge();
                 return true;
             }
@@ -931,6 +1131,7 @@
             host.style.top = r.top + 'px';
             host.style.width = r.width + 'px';
             host.style.height = r.height + 'px';
+            hostRectCache = r;
             layoutBadge();
             return true;
         }
@@ -944,6 +1145,11 @@
         };
         document.addEventListener('fullscreenchange', adjustFullscreenParent);
         document.addEventListener('webkitfullscreenchange', adjustFullscreenParent);
+
+        document.addEventListener('pointermove', onPointerMove, { passive: true });
+        document.addEventListener('pointermove', onPointerNearEdge, { passive: true });
+        document.addEventListener('pointerdown', onPointerMove, { passive: true, capture: true });
+        scheduleIdleHide();
 
         let rafPending = false;
         const schedulePosition = () => {
@@ -972,10 +1178,25 @@
             syncDisplay,
             position: positionHost,
             layout: layoutBadge,
+            refreshSettings() {
+                clearTimeout(idleTimer);
+                clearTimeout(collapseTimer);
+                stripOpen = false;
+                hushed = false;
+                badge.classList.remove('mc-strip-open');
+                badge.classList.remove('mc-hushed');
+                layoutBadge();
+                scheduleIdleHide();
+            },
             destroy() {
+                clearTimeout(idleTimer);
+                clearTimeout(collapseTimer);
                 try { resizeObserver && resizeObserver.disconnect(); } catch (e) { }
                 window.removeEventListener('scroll', schedulePosition, { capture: true });
                 window.removeEventListener('resize', schedulePosition);
+                document.removeEventListener('pointermove', onPointerMove);
+                document.removeEventListener('pointermove', onPointerNearEdge);
+                document.removeEventListener('pointerdown', onPointerMove, { capture: true });
                 document.removeEventListener('click', onOutsideClick, { capture: true });
                 document.removeEventListener('fullscreenchange', adjustFullscreenParent);
                 document.removeEventListener('webkitfullscreenchange', adjustFullscreenParent);
@@ -1498,6 +1719,19 @@
             settings.showOverlay = changes.showOverlay.newValue !== false;
             if (!settings.showOverlay) destroyOverlay();
             else if (state.enabled) syncOverlay();
+        }
+        if (changes.overlayStyle || changes.autoHide) {
+            const nextStyle = changes.overlayStyle && changes.overlayStyle.newValue;
+            if (nextStyle === 'strip' || nextStyle === 'pill') settings.overlayStyle = nextStyle;
+            const nextAutoHide = changes.autoHide && changes.autoHide.newValue;
+            if (typeof nextAutoHide === 'boolean') settings.autoHide = nextAutoHide;
+            if (state.overlay && state.overlay.refreshSettings) state.overlay.refreshSettings();
+        }
+        if (changes.wheelVolumeStep !== undefined || changes.wheelSpeedStep !== undefined) {
+            const v = Number(changes.wheelVolumeStep && changes.wheelVolumeStep.newValue);
+            const sp = Number(changes.wheelSpeedStep && changes.wheelSpeedStep.newValue);
+            if (WHEEL_STEPS.includes(v)) settings.wheelVolumeStep = v;
+            if (WHEEL_STEPS.includes(sp)) settings.wheelSpeedStep = sp;
         }
     });
 

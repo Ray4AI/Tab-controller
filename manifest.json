@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Volume Booster & Video Speed Controller",
-  "version": "2.2",
+  "version": "2.3",
   "browser_specific_settings": {
     "gecko": {
       "id": "tab-controller@ray4ai.github.io",

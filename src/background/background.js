@@ -22,12 +22,20 @@ const DEFAULT_WHITELIST = [
 // Seed the default activation scope on install/update. Existing user values are
 // never touched.
 chrome.runtime.onInstalled.addListener(() => {
-    chrome.storage.local.get(['siteMode', 'whitelist', 'showOverlay', 'autoRemember'], (result) => {
+    const keys = [
+        'siteMode', 'whitelist', 'showOverlay', 'autoRemember',
+        'overlayStyle', 'autoHide', 'wheelVolumeStep', 'wheelSpeedStep'
+    ];
+    chrome.storage.local.get(keys, (result) => {
         const updates = {};
         if (!result.siteMode) updates.siteMode = 'whitelist';
         if (!Array.isArray(result.whitelist)) updates.whitelist = DEFAULT_WHITELIST;
         if (typeof result.showOverlay !== 'boolean') updates.showOverlay = true;
         if (!result.autoRemember) updates.autoRemember = 'domain';
+        if (!result.overlayStyle) updates.overlayStyle = 'pill';
+        if (typeof result.autoHide !== 'boolean') updates.autoHide = true;
+        if (!result.wheelVolumeStep) updates.wheelVolumeStep = 5;
+        if (!result.wheelSpeedStep) updates.wheelSpeedStep = 5;
         if (Object.keys(updates).length) chrome.storage.local.set(updates);
     });
 });

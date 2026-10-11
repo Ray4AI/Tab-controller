@@ -406,6 +406,115 @@ server.listen(PORT, async () => {
         check(!Object.keys(offState).some(k => k.startsWith('saved_')),
             'auto-remember Off keeps settings temporary again');
 
+        // ── TEST 10: side-rail layout + auto-hide ───────────────────────
+        console.log('\n--- TEST 10: side rail fused to the player edge ---');
+        await setStorage({ siteMode: 'all', showOverlay: true, overlayStyle: 'strip', autoHide: false });
+        const rail = await browser.newPage();
+        await rail.goto(ORIGIN + '/');
+        await rail.waitForSelector('#video1');
+        await sleep(2200);
+
+        const railInfo = await rail.evaluate(() => {
+            const host = document.querySelector('.__mc-overlay-host');
+            const badge = host.shadowRoot.querySelector('.mc-badge');
+            const b = badge.getBoundingClientRect();
+            const v = document.querySelector('#video1').getBoundingClientRect();
+            return {
+                badge: { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height },
+                video: { r: v.right, t: v.top, b: v.bottom, h: v.height },
+                transform: badge.style.transform
+            };
+        });
+        check(Math.abs(railInfo.badge.r - railInfo.video.r) < 6,
+            `rail hugs the player's right edge (${Math.round(railInfo.badge.r)} vs ${Math.round(railInfo.video.r)})`);
+        check(railInfo.badge.h > railInfo.badge.w * 2, `rail is vertical (${Math.round(railInfo.badge.w)}x${Math.round(railInfo.badge.h)})`);
+        check(Math.abs((railInfo.badge.t + railInfo.badge.b) / 2 - (railInfo.video.t + railInfo.video.b) / 2) < 6,
+            'rail is vertically centred inside the player');
+        check(/rotate\(90deg\)/.test(railInfo.transform), `rail is rotated (${railInfo.transform})`);
+
+        // hovering expands it into the full horizontal badge
+        await rail.mouse.move((railInfo.badge.l + railInfo.badge.r) / 2, (railInfo.badge.t + railInfo.badge.b) / 2);
+        await sleep(700);
+        let opened = await rail.evaluate(() => {
+            const b = document.querySelector('.__mc-overlay-host').shadowRoot.querySelector('.mc-badge').getBoundingClientRect();
+            return { w: b.width, h: b.height, r: b.right, l: b.left };
+        });
+        check(opened.w > opened.h * 2, `hovering opens the rail into a horizontal badge (${Math.round(opened.w)}x${Math.round(opened.h)})`);
+        check(opened.l >= 0 && opened.r <= 1200, 'opened badge stays inside the window');
+
+        // auto-hide: turn it on, move the pointer away, wait, and it must slide out
+        await setStorage({ autoHide: true });
+        await rail.mouse.move(10, 10);
+        await sleep(4200);
+        let hushed = await rail.evaluate(() => {
+            const badge = document.querySelector('.__mc-overlay-host').shadowRoot.querySelector('.mc-badge');
+            return { cls: badge.className, opacity: getComputedStyle(badge).opacity, transform: badge.style.transform };
+        });
+        check(hushed.cls.includes('mc-hushed') && parseFloat(hushed.opacity) === 0,
+            `badge auto-hides when idle (${hushed.cls}, opacity ${hushed.opacity})`);
+        check(/translateX\((\d+)px\)/.test(hushed.transform) && parseFloat(hushed.transform.match(/translateX\(([-\d.]+)px\)/)[1]) > 10,
+            `hidden rail slides out of the way (${hushed.transform})`);
+
+        await rail.mouse.move(600, 300);
+        await sleep(500);
+        hushed = await rail.evaluate(() => {
+            const badge = document.querySelector('.__mc-overlay-host').shadowRoot.querySelector('.mc-badge');
+            return { cls: badge.className, opacity: getComputedStyle(badge).opacity };
+        });
+        check(!hushed.cls.includes('mc-hushed') && parseFloat(hushed.opacity) > 0.1,
+            `moving the pointer brings it back (opacity ${hushed.opacity})`);
+
+        // switching back to the floating pill must take effect live
+        await setStorage({ overlayStyle: 'pill' });
+        await sleep(700);
+        const backToPill = await rail.evaluate(() => {
+            const badge = document.querySelector('.__mc-overlay-host').shadowRoot.querySelector('.mc-badge');
+            const b = badge.getBoundingClientRect();
+            return { w: b.width, h: b.height, transform: badge.style.transform, cls: badge.className };
+        });
+        check(backToPill.w > backToPill.h * 2 && backToPill.transform === 'none' && !backToPill.cls.includes('mc-strip'),
+            `switching back to the floating badge works live (${Math.round(backToPill.w)}x${Math.round(backToPill.h)}, ${backToPill.transform})`);
+
+        // ── TEST 11: configurable wheel granularity ──────────────────────
+        console.log('\n--- TEST 11: wheel step is configurable ---');
+        await setStorage({ wheelVolumeStep: 25, wheelSpeedStep: 50, autoHide: false, overlayStyle: 'pill' });
+        await sendToTabs('/page2', { action: 'setVolume', value: 1.0 });
+        await sendToTabs('/page2', { action: 'setSpeed', value: 1.0 });
+        await sleep(500);
+
+        const wheel = async (sel, deltaY) => rail.evaluate((s, d) => {
+            const zone = document.querySelector('.__mc-overlay-host').shadowRoot.querySelector(s);
+            zone.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: d }));
+        }, sel, deltaY);
+
+        await wheel('.mc-zone-vol', -100);
+        await sleep(300);
+        let after = await badgeInfo(rail);
+        check(after.hosts[0] && after.hosts[0].volume === '125%',
+            `volume wheel uses the 25% step (${after.hosts[0] && after.hosts[0].volume})`);
+
+        await wheel('.mc-zone-vol', 100);
+        await wheel('.mc-zone-vol', 100);
+        await sleep(300);
+        after = await badgeInfo(rail);
+        check(after.hosts[0] && after.hosts[0].volume === '75%',
+            `wheel down by two 25% steps (${after.hosts[0] && after.hosts[0].volume})`);
+
+        await wheel('.mc-zone-speed', -100);
+        await sleep(300);
+        after = await badgeInfo(rail);
+        check(after.hosts[0] && after.hosts[0].speed === '1.50x',
+            `speed wheel uses the 0.5x step (${after.hosts[0] && after.hosts[0].speed})`);
+
+        // a finer setting must be honoured too
+        await setStorage({ wheelVolumeStep: 5 });
+        await sleep(300);
+        await wheel('.mc-zone-vol', -100);
+        await sleep(300);
+        after = await badgeInfo(rail);
+        check(after.hosts[0] && after.hosts[0].volume === '80%',
+            `changing the step to 5% applies immediately (${after.hosts[0] && after.hosts[0].volume})`);
+
         console.log(`\n${failures === 0 ? '🏆 ALL TESTS PASSED' : `❌ ${failures} TEST(S) FAILED`}`);
     } catch (err) {
         failures++;

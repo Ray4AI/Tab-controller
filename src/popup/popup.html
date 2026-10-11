@@ -19,7 +19,7 @@
             </div>
             <div class="header-text">
                 <h1>Media Booster</h1>
-                <p>Tab Media Control v2.2</p>
+                <p>Tab Media Control v2.3</p>
             </div>
         </div>
         <label class="theme-switch" title="Toggle Dark/Light Mode">
@@ -70,10 +70,6 @@
             <div class="host-chips" id="hostChips"></div>
         </div>
 
-        <div class="sites-foot">
-            <button class="btn-mini" id="btnToggleOverlay" title="Show or hide the on-video badge">Hide badge</button>
-            <button class="btn-mini" id="btnResetBadge" title="Put the badge back to the top of the player">Reset badge position</button>
-        </div>
     </div>
 
     <!-- Main Controls Grid (Volume & Speed Side-by-Side) -->
@@ -172,6 +168,58 @@
             <button class="btn-action btn-save" id="btnSaveGlobal">Global</button>
         </div>
         <button class="btn-reset" id="btnClearPreset">Reset to Default</button>
+    </div>
+
+    <!-- On-video overlay card -->
+    <div class="section section-overlay">
+        <div class="sites-head">
+            <div class="sites-head-left">
+                <span class="save-title-small">ON-VIDEO CONTROLS</span>
+                <span class="sites-title">Overlay &amp; wheel</span>
+            </div>
+            <div id="overlayStyleBadge" class="save-badge save-badge--none">FLOATING</div>
+        </div>
+
+        <div class="opt-row">
+            <span class="opt-label">Layout</span>
+            <div class="seg seg-sm" id="styleSeg">
+                <button class="seg-btn" data-style="pill">Floating</button>
+                <button class="seg-btn" data-style="strip">Side rail</button>
+            </div>
+        </div>
+
+        <div class="opt-row">
+            <span class="opt-label">Auto-hide</span>
+            <div class="seg seg-sm" id="autoHideSeg">
+                <button class="seg-btn" data-autohide="on">On</button>
+                <button class="seg-btn" data-autohide="off">Off</button>
+            </div>
+        </div>
+
+        <div class="opt-block-title">WHEEL STEP</div>
+        <div class="opt-row">
+            <span class="opt-label">Volume</span>
+            <div class="seg seg-sm" id="volStepSeg">
+                <button class="seg-btn" data-step="5">5%</button>
+                <button class="seg-btn" data-step="10">10%</button>
+                <button class="seg-btn" data-step="25">25%</button>
+                <button class="seg-btn" data-step="50">50%</button>
+            </div>
+        </div>
+        <div class="opt-row">
+            <span class="opt-label">Speed</span>
+            <div class="seg seg-sm" id="speedStepSeg">
+                <button class="seg-btn" data-step="5">0.05x</button>
+                <button class="seg-btn" data-step="10">0.1x</button>
+                <button class="seg-btn" data-step="25">0.25x</button>
+                <button class="seg-btn" data-step="50">0.5x</button>
+            </div>
+        </div>
+
+        <div class="sites-foot">
+            <button class="btn-mini" id="btnToggleOverlay" title="Show or hide the on-video badge">Hide badge</button>
+            <button class="btn-mini" id="btnResetBadge" title="Put the badge back to the top of the player">Reset position</button>
+        </div>
     </div>
 
     <script src="popup.js"></script>
