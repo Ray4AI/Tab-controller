@@ -19,7 +19,7 @@
             </div>
             <div class="header-text">
                 <h1>Media Booster</h1>
-                <p>Tab Media Control v1.6</p>
+                <p>Tab Media Control v2.0</p>
             </div>
         </div>
         <label class="theme-switch" title="Toggle Dark/Light Mode">
@@ -40,6 +40,40 @@
                 </span>
             </span>
         </label>
+    </div>
+
+    <!-- Activation / Site scope Card -->
+    <div class="section section-sites">
+        <div class="sites-head">
+            <div class="sites-head-left">
+                <span class="save-title-small">ACTIVATION</span>
+                <span class="sites-title">Where it runs</span>
+            </div>
+            <div id="siteStatusBadge" class="save-badge save-badge--none">CHECKING…</div>
+        </div>
+
+        <div class="seg" id="modeSeg" role="group" aria-label="Activation scope">
+            <button class="seg-btn" data-mode="whitelist" id="segWhitelist">Whitelist only</button>
+            <button class="seg-btn" data-mode="all" id="segAll">All sites</button>
+        </div>
+
+        <div class="sites-current">
+            <span class="sites-current-host" id="currentHostLabel">—</span>
+            <button class="btn-mini" id="btnToggleSite">Add</button>
+        </div>
+
+        <div id="whitelistArea">
+            <div class="sites-add">
+                <input type="text" id="newHostInput" placeholder="add a domain, e.g. vimeo.com" spellcheck="false">
+                <button class="btn-mini btn-mini-accent" id="btnAddHost">Add</button>
+            </div>
+            <div class="host-chips" id="hostChips"></div>
+        </div>
+
+        <div class="sites-foot">
+            <button class="btn-mini" id="btnToggleOverlay" title="Show or hide the on-video badge">Hide badge</button>
+            <button class="btn-mini" id="btnResetBadge" title="Put the badge back to the top of the player">Reset badge position</button>
+        </div>
     </div>
 
     <!-- Main Controls Grid (Volume & Speed Side-by-Side) -->

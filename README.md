@@ -1,60 +1,134 @@
-# Media Controller 
+# Media Controller (Volume Booster & Video Speed Controller)
 
-This is a simple browser extension I put together to give you more control over your browser's audio and video. If you've ever felt like a video was too quiet even at 100%, or if you wanted to fly through a long lecture without clicking menus, this is for you.
+A browser extension that gives you control over the audio and video already playing in your
+browser: boost volume up to **500 %**, change playback speed from **0.10x to 16x**, all per tab —
+and now **only on the sites you allow**.
 
-## Downloads
+This repository is a fork of
+[Zafkiel-dal/Tab-controller](https://github.com/Zafkiel-dal/Tab-controller) with the v2.0
+behaviour fixes and the whitelist feature described below. It is built for
+**self-hosted (unlisted) Firefox distribution**: you submit the `.xpi` to
+addons.mozilla.org for signing, then hand the signed file to your users.
 
-| Browser | Link |
-| :--- | :--- |
-| <img src="https://raw.githubusercontent.com/alrra/browser-logos/main/src/chromium/chromium_16x16.png" width="16" height="16" /><br>**Chrome / Edge / Brave / Chromium based** | [Install from Chrome Web Store](https://chromewebstore.google.com/detail/volume-booster-video-spee/mimbgeljdhgcmenoplikfeeicimfjjai) |
-| <img src="https://raw.githubusercontent.com/alrra/browser-logos/main/src/firefox/firefox_16x16.png" width="16" height="16" /><br>**Firefox** | [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/media-controller_ets/) |
+---
 
+## What's new in v2.0
 
-## Why this exists
+| | Before | Now (v2.0) |
+| :--- | :--- | :--- |
+| **Bilibili hover previews** | Hovering a recommendation started an inline preview player; that extra `<video>` hijacked the shared audio graph and the tab volume snapped back to 100 %. | Only the **primary video** (the biggest visible one) is ever controlled. Previews, trailers, ads, background videos and secondary players are completely untouched. |
+| **Ads / preview clips** | Boosted and sped up like any other video. | Never touched. They have no overlay and no audio routing. |
+| **Web Audio** | Every `<video>`/`<audio>` on the page was permanently routed through a gain node. | Web Audio is hooked **lazily**, only for the primary element, and only when a boost above 100 % is actually requested. At 100 % the extension is completely passive. |
+| **The floating badge** | Clamped inside the player rectangle — it always covered part of the video. | Can be **dragged anywhere on the screen**, including outside the player. The position is remembered per site; double-click the badge (or use the popup) to snap it back. |
+| **Where it runs** | Every website, all the time. | **Whitelist scope**: only the sites you list. Manage it from the popup (add/remove sites, or switch to "All sites"). |
+| **Badge visibility** | Always on. | Can be switched off entirely from the popup while keeping the keyboard/popup controls. |
 
-I was tired of browser limitations, so I built this to do a few specific things:
+---
 
-- **Volume Boost (Up to 500%)**: Sometimes 100% just isn't enough. This uses the Web Audio API to crank things up to 5x the normal volume. Great for quiet laptop speakers!
-- **Insane Speed Control**: You can go anywhere from 0.25x (super slow) to 16x (super fast). It's a smooth slider, so you aren't stuck with just the standard presets.
-- **Per-Tab Customization**: The best part? Each tab is independent. You can boost a video in one tab while keeping music at a normal level in another.
-- **On-Video Controls**: Instead of clicking the extension icon every time, a small badge appears right on the video player. You can tweak speed, volume, and opacity from there, and even drag it anywhere on the screen.
-- **Smart Preset System**: Don't want to adjust settings every time? Save your settings to a specific **Tab**, an entire **Domain** (e.g., all of YouTube), or **Globally** across the internet.
-- **It’s Light & Dark**: If you prefer dark mode, it looks great. If you're a fan of light mode, there's a toggle for that too.
+## Installing the self-hosted build
+
+1. Build (or download) `dist/media-controller-2.0.xpi`.
+2. Submit that file at <https://addons.mozilla.org/developers/addon/submit/distribution> and
+   choose **"On your own"** (self-distribution). Mozilla signs it and gives you a signed `.xpi`.
+3. Publish the signed file (GitHub Releases works well) and set that URL in
+   [`updates.json`](updates.json) → `update_link`.
+4. Users install it by opening the `.xpi` in Firefox. Because `manifest.json` declares
+   `browser_specific_settings.gecko.update_url`, Firefox checks `updates.json` and
+   auto-updates from it.
+
+The add-on id is `tab-controller@ray4ai.github.io`; keep it stable so updates keep working.
+
+---
 
 ## Detailed User Manual
 
-### 1. The Video Overlay (Quick Controls)
-Whenever you watch a video, a tiny controller badge will appear in the top-left corner of the video player.
+### 1. Activation scope (whitelist)
 
-- **Speed (e.g., 1.00x)**: Hover over the speed text to reveal a slider. You can dial it anywhere from 0.25x to 16x. You also have quick buttons for 1.5x, 2.0x, etc.
-- **Volume (e.g., 100%)**: Hover over the volume text to reveal a slider. This goes up to 500% to boost quiet audio!
-- **Reset**: Click this immediately reset the video speed to 1.0x and volume to 100%.
-- **Save Mode**: Lock your settings so they stick (explained below in *Preset Memory System*).
-- **Opacity Eye**: Makes the badge more transparent so it doesn't distract you while watching.
-- **Drag & Drop**: Click and hold any empty space on the badge to drag it around the screen. If the video player shrinks, the badge is smart enough to slide back into bounds!
+The extension now runs **only on whitelisted sites** by default. Open the toolbar popup:
 
-### 2. The Full Dashboard (Popup)
-Click the extension icon in your toolbar to see the full dashboard. You'll find sliders, a theme toggle, and the central hub for managing your saved Presets.
+* **Whitelist only** — the extension starts on the listed domains only (default list:
+  Bilibili, YouTube, Netflix, Twitch, Vimeo, Dailymotion, Niconico, iQiyi, Tencent Video,
+  Youku, Zhihu, Coursera, Udemy, SoundCloud, Spotify).
+* **All sites** — old behaviour, the extension runs everywhere.
+* **Allow / Remove** — add or remove the site you are currently on.
+* The text box below adds any domain manually (`example.com` also covers `www.example.com`
+  and every sub-domain).
+* Changing the scope takes effect immediately, in already-open tabs.
 
-### 3. The Preset Memory System (How to lock your settings)
-By default, changed speeds and volumes are **temporary**. If you open a new video or refresh the page, they reset back to 1.0x / 100%.
+When a site is not allowed the content script does nothing at all: no badge, no audio routing,
+no playback-rate changes.
 
-If you want your settings to stick, you need to save them using the **Save Mode** menu on the video overlay or within the extension popup.
+### 2. The video overlay (quick controls)
 
-**The 3 Save Modes:**
-1. **[T] Tab Mode**: Locks the speed/volume for **this specific browser tab**. No matter what URL you visit within this tab, the settings will remain locked.
-2. **[D] Domain Mode**: Locks the settings for **the entire website** (e.g., all of `youtube.com`). Whenever you open a video on this site, it will automatically apply your saved speed/volume. 
-3. **[G] Global Mode**: Locks the settings across the **entire internet**. Every video on every website will inherit these settings.
+A small badge is attached to the **primary video** — the largest visible video of the page.
+Hover previews, ads and background clips never get one.
 
-**Reset to Default (Clear)**
-If you click **[✕]** on the overlay or **"Reset to Default"** in the popup, you will clear all saved presets. This returns the extension to **Default Tracking Mode**.
+* **Speed (e.g. `1.00x`)** — hover the chip for `−`, `1×`, `+`, or scroll the wheel.
+* **Volume (e.g. `100%`)** — hover for a slider, or scroll the wheel. Goes up to 500 %.
+* **Reset** — speed back to 1.0x **and** volume back to 100 %.
+* **Save (bookmark)** — `T` lock to tab, `D` lock to domain, `G` lock globally, `✕` clear.
+* **Eye** — badge opacity, remembered for every site.
+* **Drag handle (⣿)** — drag it anywhere: on the player, in the empty space beside it, or on
+  another part of the page. **Double-click** the badge to snap it back onto the player.
+  The position is saved per site.
 
-### 4. How "Default Mode" actually works (Advanced)
-If you don't save your settings (meaning you are in "Default Mode"), the extension uses an intelligent system to decide when to reset the video back to 1.0x / 100%.
+### 3. The full dashboard (popup)
 
-- **Scenario A: YouTube, Netflix, Courses**: If you open a new video link or the website autoloads the next video in a playlist, the extension detects the clip change and **resets the speed back to 1.0x**. This prevents loud, fast audio from suddenly blasting your ears on a new video.
-- **Scenario B: Facebook, Reddit, X (Endless Scrolling)**: When you scroll through a social media feed, videos are dynamically loaded into the background. In Default Mode, your temporary speed setting (e.g., 1.5x) will naturally "bleed" onto nearby clips as you scroll! This acts as a comfortable mini-feature, letting you watch an entire session of scrolling memes at 1.5x without having to explicitly lock the Tab. *(If you want to absolutely guarantee a strict speed across your entire scrolling session, use the **[T] Tab** lock).*
+Volume + speed sliders, activation scope, badge visibility, theme switch and the preset
+manager.
 
-### 5. YouTube Synchronization
-The extension is deeply integrated with YouTube. If you use YouTube's native gear icon or keyboard shortcuts (`Shift + .`) to change the video speed, the extension will instantly sync and adopt YouTube's speed, ensuring everything stays perfectly aligned without fighting each other!
+### 4. Preset memory
 
+Speeds/volumes are temporary unless saved:
+
+1. **[T] Tab** — this tab only (.e.g a tab you keep open for a long video).
+2. **[D] Domain** — every page of that site.
+3. **[G] Global** — every site.
+4. **[✕] / "Reset to Default"** — clears the highest-priority layer, falling back to the next
+   one (Tab → Domain → Global → default).
+
+Without any preset ("default mode") the extension resets the primary video to 1.0x / 100 %
+when a **new clip** starts loading in the *same* player element. Preview clips and other
+secondary media never trigger that reset.
+
+### 5. YouTube synchronisation
+
+If you change the speed with YouTube's own gear icon or shortcuts, the extension adopts the new
+value instead of fighting it (primary video only).
+
+---
+
+## Development
+
+```bash
+npm install            # puppeteer for the e2e suite
+npm test               # end-to-end tests (downloads Chromium)
+npm run build:manifests  # dist/chrome + dist/firefox manifests
+npm run build:xpi        # dist/media-controller-<version>.xpi (Firefox, self-hosted)
+```
+
+### Layout
+
+```
+manifest.json              MV3 manifest (Chrome service worker + Firefox scripts)
+src/content/content.js     content script: primary-media detection, audio graph, overlay
+src/background/background.js  preset storage, defaults, message routing
+src/popup/                 dashboard UI (controls + activation scope)
+scripts/build-manifests.js browser-specific manifest generation
+scripts/build-xpi.sh       zip → signed-ready .xpi
+tests/                     puppeteer e2e suite + fixtures
+updates.json               Firefox self-hosted update manifest
+```
+
+### How the primary video is chosen
+
+`score = area` (only for videos at least 120×90 that are actually on screen), `× 0.05` when the
+video is muted, `× 0.9` when it is paused. Audio-only players get a fixed mid score. The
+previous primary keeps the badge unless a challenger is more than 1.6× bigger, which stops the
+badge from flickering between two equally sized players.
+
+---
+
+## License
+
+ISC — see [LICENSE](LICENSE). Original work © the upstream authors.

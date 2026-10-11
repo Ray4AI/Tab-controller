@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Page 1 - Multi Video & Shadow DOM</title>
+    <title>Test Page 1 - Primary / Preview / Shadow DOM</title>
     <style>
         body {
             margin: 0;
@@ -15,26 +15,28 @@
         }
 
         .container {
-            max-width: 900px;
-            margin: 0 auto;
+            max-width: 640px;
         }
 
         .video-box {
-            margin-bottom: 40px;
+            margin-bottom: 30px;
             background: #2a2a2a;
             padding: 10px;
             border-radius: 12px;
         }
 
-        video {
+        .video-box video {
             width: 100%;
+            aspect-ratio: 16 / 9;
             border-radius: 8px;
             background: #000;
+            display: block;
         }
 
         h2 {
             margin-top: 0;
             color: #a6e3a1;
+            font-size: 16px;
         }
 
         .badge {
@@ -46,6 +48,23 @@
             font-size: 12px;
             margin-left: 10px;
         }
+
+        /* Mirrors Bilibili's inline recommendation player: a small, muted
+           video that starts playing on hover. */
+        #recommendations {
+            position: fixed;
+            right: 20px;
+            top: 40px;
+            width: 200px;
+        }
+
+        #preview {
+            width: 190px;
+            height: 107px;
+            background: #000;
+            border-radius: 8px;
+            display: block;
+        }
     </style>
 </head>
 
@@ -55,44 +74,66 @@
 
         <div class="video-box">
             <h2>Video 1 (Primary)</h2>
-            <video id="video1" controls
+            <video id="video1" controls muted
                 src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
                 crossorigin="anonymous"></video>
         </div>
 
         <div class="video-box">
             <h2>Video 2 (Secondary)</h2>
-            <video id="video2" controls
+            <video id="video2" controls muted
                 src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
                 crossorigin="anonymous"></video>
         </div>
 
-        <!-- NEW: Shadow DOM Test Case -->
+        <!-- Shadow DOM Test Case -->
         <div class="video-box">
             <h2>Video 3 <span class="badge">Inside Shadow DOM</span></h2>
             <div id="shadowHost"></div>
         </div>
     </div>
 
+    <!-- Hover-preview style player (small + muted, like Bilibili recommendations) -->
+    <div id="recommendations">
+        <video id="preview" muted loop
+            src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+            crossorigin="anonymous"></video>
+    </div>
+
     <script>
-        // Create a Shadow DOM host to simulate sites like Reddit
+        // Shadow DOM host, simulating sites like Reddit.
         const host = document.getElementById('shadowHost');
-        const shadow = host.attachShadow({ mode: 'open' }); // We use open for testing, extension supports both
+        const shadow = host.attachShadow({ mode: 'open' });
 
         const container = document.createElement('div');
         container.className = 'video-container';
-        container.innerHTML = `
-            <video id="shadowVideo" controls src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4" crossorigin="anonymous"></video>
-        `;
+        const video = document.createElement('video');
+        video.id = 'shadowVideo';
+        video.controls = true;
+        video.muted = true;
+        video.crossOrigin = 'anonymous';
+        video.src = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4';
+        container.appendChild(video);
 
-        // Inherit styles
         const style = document.createElement('style');
-        style.textContent = `
-            video { width: 100%; border-radius: 8px; background: #000; }
-        `;
+        style.textContent = 'video { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background: #000; display:block; }';
 
         shadow.appendChild(style);
         shadow.appendChild(container);
+
+        // Expose helpers for the e2e suite.
+        window.__fixture = {
+            playPreview() {
+                const preview = document.getElementById('preview');
+                preview.muted = true;
+                return preview.play().catch(() => { });
+            },
+            reloadPreview() {
+                const preview = document.getElementById('preview');
+                preview.muted = true;
+                preview.load();
+            }
+        };
     </script>
 </body>
 

@@ -1,3 +1,36 @@
+// Sites that get the extension when the whitelist scope is enabled.
+// Kept in sync with src/content/content.js.
+const DEFAULT_WHITELIST = [
+    'bilibili.com',
+    'youtube.com',
+    'youtu.be',
+    'netflix.com',
+    'twitch.tv',
+    'vimeo.com',
+    'dailymotion.com',
+    'nicovideo.jp',
+    'iqiyi.com',
+    'v.qq.com',
+    'youku.com',
+    'zhihu.com',
+    'coursera.org',
+    'udemy.com',
+    'soundcloud.com',
+    'spotify.com'
+];
+
+// Seed the default activation scope on install/update. Existing user values are
+// never touched.
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.storage.local.get(['siteMode', 'whitelist', 'showOverlay'], (result) => {
+        const updates = {};
+        if (!result.siteMode) updates.siteMode = 'whitelist';
+        if (!Array.isArray(result.whitelist)) updates.whitelist = DEFAULT_WHITELIST;
+        if (typeof result.showOverlay !== 'boolean') updates.showOverlay = true;
+        if (Object.keys(updates).length) chrome.storage.local.set(updates);
+    });
+});
+
 // Clean up storage variables when a tab is actively closed
 chrome.tabs.onRemoved.addListener((tabId) => {
     chrome.storage.local.remove([

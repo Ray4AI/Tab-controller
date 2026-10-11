@@ -23,6 +23,9 @@ function buildChromeManifest(source) {
     manifest.background = {
         service_worker: source.background.service_worker
     };
+    // Chrome has no notion of gecko settings and an `update_url` would make it
+    // look for a non-store update manifest, so drop the whole block.
+    delete manifest.browser_specific_settings;
     return manifest;
 }
 

@@ -21,8 +21,10 @@
 
         video {
             width: 100%;
+            aspect-ratio: 16 / 9;
             border-radius: 8px;
             background: #000;
+            display: block;
         }
     </style>
 </head>
@@ -30,7 +32,7 @@
 <body>
     <div class="container">
         <h1>Domain Persistence Test Page</h1>
-        <video id="videoA" controls
+        <video id="videoA" controls muted
             src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
             crossorigin="anonymous"></video>
     </div>

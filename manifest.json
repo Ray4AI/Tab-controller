@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Volume Booster & Video Speed Controller",
-  "version": "1.5",
+  "version": "2.0",
   "browser_specific_settings": {
     "gecko": {
-      "id": "media-controller@extension.local",
+      "id": "tab-controller@ray4ai.github.io",
       "strict_min_version": "142.0",
+      "update_url": "https://raw.githubusercontent.com/Ray4AI/Tab-controller/main/updates.json",
       "data_collection_permissions": {
         "required": [
           "none"
@@ -13,7 +14,7 @@
       }
     }
   },
-  "description": "Adjust volume up to 500% and playback speed up to 16x for individual tabs.",
+  "description": "Boost volume up to 500% and playback speed up to 16x for individual tabs, only on the sites you allow.",
   "permissions": [
     "activeTab",
     "scripting",

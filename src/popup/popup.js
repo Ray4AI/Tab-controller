@@ -1,9 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Theme Switch logic
+    // ── Theme ───────────────────────────────────────────────────────────
     const themeToggle = document.getElementById('themeToggle');
     const rootElement = document.documentElement;
 
-    // Load Theme preference
     chrome.storage.local.get(['themePref'], (result) => {
         if (result.themePref === 'light') {
             rootElement.setAttribute('data-theme', 'light');
@@ -13,30 +12,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Toggle and save theme
     themeToggle.addEventListener('change', (e) => {
         const newTheme = e.target.checked ? 'dark' : 'light';
-        if (newTheme === 'light') {
-            rootElement.setAttribute('data-theme', 'light');
-        } else {
-            rootElement.removeAttribute('data-theme');
-        }
+        if (newTheme === 'light') rootElement.setAttribute('data-theme', 'light');
+        else rootElement.removeAttribute('data-theme');
         chrome.storage.local.set({ themePref: newTheme });
     });
 
-    // Volume Elements
+    // ── Elements ────────────────────────────────────────────────────────
     const volSlider = document.getElementById('volumeSlider');
     const volValueDisplay = document.getElementById('volumeValue');
     const btnVolReset = document.getElementById('btnVolReset');
     const btnVolMute = document.getElementById('btnVolMute');
 
-    // Speed Elements
     const speedSlider = document.getElementById('speedSlider');
     const speedValueDisplay = document.getElementById('speedValue');
     const btnSpeedReset = document.getElementById('btnSpeedReset');
     const btnSpeedFast = document.getElementById('btnSpeedFast');
 
-    // Save Elements
     const btnSaveTab = document.getElementById('btnSaveTab');
     const btnSaveDomain = document.getElementById('btnSaveDomain');
     const btnSaveGlobal = document.getElementById('btnSaveGlobal');
@@ -44,10 +37,155 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveStatusBadge = document.getElementById('saveStatusBadge');
     const saveInfo = document.getElementById('saveInfo');
 
+    const segWhitelist = document.getElementById('segWhitelist');
+    const segAll = document.getElementById('segAll');
+    const siteStatusBadge = document.getElementById('siteStatusBadge');
+    const currentHostLabel = document.getElementById('currentHostLabel');
+    const btnToggleSite = document.getElementById('btnToggleSite');
+    const whitelistArea = document.getElementById('whitelistArea');
+    const newHostInput = document.getElementById('newHostInput');
+    const btnAddHost = document.getElementById('btnAddHost');
+    const hostChips = document.getElementById('hostChips');
+    const btnToggleOverlay = document.getElementById('btnToggleOverlay');
+    const btnResetBadge = document.getElementById('btnResetBadge');
+
+    // ── Site scope helpers ──────────────────────────────────────────────
+    function normalizeHost(value) {
+        return String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+            .replace(/^[^/@]*@/, '')
+            .replace(/^www\./, '')
+            .split('/')[0]
+            .split('?')[0]
+            .replace(/:\d+$/, '');
+    }
+
+    function hostMatches(host, entry) {
+        const e = normalizeHost(entry);
+        if (!e) return false;
+        return host === e || host.endsWith('.' + e);
+    }
+
+    const scope = {
+        siteMode: 'whitelist',
+        whitelist: [],
+        showOverlay: true
+    };
+
+    let currentHost = '';
+    let currentTabId = null;
+    let domain = '';
+    let modeKeys = null;
+
+    function isAllowedHere() {
+        if (!currentHost) return false;
+        if (scope.siteMode !== 'whitelist') return true;
+        return scope.whitelist.some(entry => hostMatches(currentHost, entry));
+    }
+
+    function saveScope(updates) {
+        Object.assign(scope, updates);
+        chrome.storage.local.set(updates, renderScope);
+    }
+
+    function renderScope() {
+        const whitelistMode = scope.siteMode === 'whitelist';
+        segWhitelist.classList.toggle('active', whitelistMode);
+        segAll.classList.toggle('active', !whitelistMode);
+        whitelistArea.style.display = whitelistMode ? '' : 'none';
+
+        const allowed = isAllowedHere();
+
+        if (!currentHost) {
+            siteStatusBadge.textContent = 'NO SITE';
+            siteStatusBadge.className = 'save-badge save-badge--off';
+            currentHostLabel.textContent = 'This page has no addressable host';
+            btnToggleSite.disabled = true;
+            btnToggleSite.style.opacity = '0.5';
+        } else {
+            const listed = scope.whitelist.some(entry => hostMatches(currentHost, entry));
+            siteStatusBadge.textContent = allowed ? 'ACTIVE HERE' : 'INACTIVE HERE';
+            siteStatusBadge.className = 'save-badge ' + (allowed ? 'save-badge--on' : 'save-badge--off');
+            currentHostLabel.textContent = currentHost;
+            btnToggleSite.disabled = false;
+            btnToggleSite.style.opacity = '';
+            btnToggleSite.textContent = listed ? 'Remove' : 'Allow';
+        }
+
+        btnToggleOverlay.textContent = scope.showOverlay ? 'Hide badge' : 'Show badge';
+
+        // Chips
+        while (hostChips.firstChild) hostChips.removeChild(hostChips.firstChild);
+        if (!scope.whitelist.length) {
+            const empty = document.createElement('div');
+            empty.className = 'chip-empty';
+            empty.textContent = 'No sites yet — the extension stays off everywhere.';
+            hostChips.appendChild(empty);
+        } else {
+            scope.whitelist.forEach(entry => {
+                const chip = document.createElement('div');
+                chip.className = 'chip';
+                const label = document.createElement('span');
+                label.textContent = entry;
+                const remove = document.createElement('button');
+                remove.textContent = '\u2715';
+                remove.title = `Remove ${entry}`;
+                remove.addEventListener('click', () => {
+                    saveScope({ whitelist: scope.whitelist.filter(item => item !== entry) });
+                });
+                chip.append(label, remove);
+                hostChips.appendChild(chip);
+            });
+        }
+    }
+
+    function addHost(rawValue) {
+        const host = normalizeHost(rawValue);
+        // Accept regular host names, IP addresses and single-label hosts (localhost).
+        if (!host || !/^[a-z0-9][a-z0-9.-]*$/.test(host)) return false;
+        if (scope.whitelist.some(entry => entry === host)) return true;
+        saveScope({ whitelist: scope.whitelist.concat([host]) });
+        return true;
+    }
+
+    segWhitelist.addEventListener('click', () => saveScope({ siteMode: 'whitelist' }));
+    segAll.addEventListener('click', () => saveScope({ siteMode: 'all' }));
+
+    btnToggleSite.addEventListener('click', () => {
+        if (!currentHost) return;
+        const listed = scope.whitelist.some(entry => hostMatches(currentHost, entry));
+        if (listed) {
+            saveScope({ whitelist: scope.whitelist.filter(entry => !hostMatches(currentHost, entry)) });
+        } else {
+            addHost(currentHost);
+        }
+    });
+
+    btnAddHost.addEventListener('click', () => {
+        if (addHost(newHostInput.value)) newHostInput.value = '';
+    });
+    newHostInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            if (addHost(newHostInput.value)) newHostInput.value = '';
+        }
+    });
+
+    btnToggleOverlay.addEventListener('click', () => {
+        saveScope({ showOverlay: !scope.showOverlay });
+    });
+
+    btnResetBadge.addEventListener('click', () => {
+        if (!currentHost) return;
+        chrome.storage.local.remove([`overlay_pos_${currentHost}`]);
+    });
+
+    // ── Presets ─────────────────────────────────────────────────────────
     function getCurrentPreset(tabKey, domainKey, globalKey, callback) {
         chrome.storage.local.get([tabKey, domainKey, globalKey], (result) => {
             if (result[tabKey]) return callback('tab');
-            if (result[domainKey]) return callback('domain');
+            if (domain && result[domainKey]) return callback('domain');
             if (result[globalKey]) return callback('global');
             callback('none');
         });
@@ -55,28 +193,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function syncActivePreset(mode, tabKey, domainKey, globalKey, volume, speed) {
         if (mode === 'none') return;
-
         const payload = { volume, speed };
-        if (mode === 'tab') {
-            chrome.storage.local.set({ [tabKey]: payload });
-        } else if (mode === 'domain') {
-            chrome.storage.local.set({ [domainKey]: payload });
-        } else if (mode === 'global') {
-            chrome.storage.local.set({ [globalKey]: payload });
-        }
+        if (mode === 'tab') chrome.storage.local.set({ [tabKey]: payload });
+        else if (mode === 'domain') chrome.storage.local.set({ [domainKey]: payload });
+        else if (mode === 'global') chrome.storage.local.set({ [globalKey]: payload });
     }
 
     // Shared communication logic
-    function sendToContentScript(action, value, tabId, storageKey, modeKeys) {
+    function sendToContentScript(action, value, tabId, storageKey, keys) {
         const data = {};
         data[storageKey] = value;
         chrome.storage.local.set(data);
 
-        if (modeKeys) {
+        if (keys) {
             const currentVolume = parseInt(volSlider.value, 10);
             const currentSpeed = parseInt(speedSlider.value, 10);
-            getCurrentPreset(modeKeys.tabKey, modeKeys.domainKey, modeKeys.globalKey, (mode) => {
-                syncActivePreset(mode, modeKeys.tabKey, modeKeys.domainKey, modeKeys.globalKey, currentVolume, currentSpeed);
+            getCurrentPreset(keys.tabKey, keys.domainKey, keys.globalKey, (mode) => {
+                syncActivePreset(mode, keys.tabKey, keys.domainKey, keys.globalKey, currentVolume, currentSpeed);
             });
         }
 
@@ -85,27 +218,23 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.tabs.sendMessage(tabId, {
             action: action,
             value: convertedValue
-        }).catch(err => {
+        }).catch(() => {
             // First time script injection fallback
             chrome.scripting.executeScript({
                 target: { tabId: tabId, allFrames: true },
                 files: ['src/content/content.js']
             }).then(() => {
-                chrome.tabs.sendMessage(tabId, {
-                    action: action,
-                    value: convertedValue
-                });
-            }).catch(e => console.error("Could not inject script: ", e));
+                chrome.tabs.sendMessage(tabId, { action: action, value: convertedValue });
+            }).catch((e) => console.error('Could not inject script: ', e));
         });
     }
 
     // Trigger UI updates
-    function updateVolume(vol, tabId, modeKeys) {
+    function updateVolume(vol, tabId, keys) {
         const volInt = parseInt(vol, 10);
         volSlider.value = volInt;
         volValueDisplay.textContent = volInt + '%';
 
-        // Update Mute button UI
         if (volInt === 0) {
             btnVolMute.classList.add('muted');
             btnVolMute.textContent = 'Muted';
@@ -114,18 +243,16 @@ document.addEventListener('DOMContentLoaded', () => {
             btnVolMute.textContent = 'Mute';
         }
 
-        sendToContentScript('setVolume', volInt, tabId, `tab_volume_${tabId}`, modeKeys);
+        sendToContentScript('setVolume', volInt, tabId, `tab_volume_${tabId}`, keys);
     }
 
-    function updateSpeed(speedScaled, tabId, modeKeys) {
+    function updateSpeed(speedScaled, tabId, keys) {
         const speedInt = parseInt(speedScaled, 10);
         speedSlider.value = speedInt;
-        const actualSpeed = (speedInt / 100).toFixed(2);
-        speedValueDisplay.textContent = actualSpeed + 'x';
-        sendToContentScript('setSpeed', speedInt, tabId, `tab_speed_${tabId}`, modeKeys);
+        speedValueDisplay.textContent = (speedInt / 100).toFixed(2) + 'x';
+        sendToContentScript('setSpeed', speedInt, tabId, `tab_speed_${tabId}`, keys);
     }
 
-    // Apply values to UI
     function applyToUI(vol, speed) {
         const volInt = parseInt(vol, 10);
         volSlider.value = volInt;
@@ -144,25 +271,40 @@ document.addEventListener('DOMContentLoaded', () => {
         speedValueDisplay.textContent = (speedInt / 100).toFixed(2) + 'x';
     }
 
-    // Initialize State for current tab
+    // ── Boot ────────────────────────────────────────────────────────────
+    chrome.storage.local.get(['siteMode', 'whitelist', 'showOverlay'], (result) => {
+        scope.siteMode = result.siteMode || 'whitelist';
+        scope.whitelist = Array.isArray(result.whitelist) ? result.whitelist : [];
+        scope.showOverlay = result.showOverlay !== false;
+        renderScope();
+    });
+
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs.length === 0) return;
         const activeTab = tabs[0];
         const tabId = activeTab.id;
+        currentTabId = tabId;
 
-        let domain = '';
         try {
             if (activeTab.url) {
-                domain = new URL(activeTab.url).hostname;
+                const parsed = new URL(activeTab.url);
+                if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'file:') {
+                    domain = parsed.hostname;
+                    currentHost = normalizeHost(parsed.hostname);
+                }
             }
         } catch (e) { }
 
+        renderScope();
+
+        // Storage keys for this tab/site
         const tabKey = `saved_tab_${tabId}`;
         const domainKey = `saved_domain_${domain}`;
         const globalKey = 'saved_global';
-        const modeKeys = { tabKey, domainKey, globalKey };
+        const keys = { tabKey, domainKey, globalKey };
+        modeKeys = keys;
 
-        // 1. Load contextually: Check if we have a saved state for this tab/domain/global
+        // 1. Load contextually: saved tab / domain / global preset
         function loadContext() {
             chrome.storage.local.get([tabKey, domainKey, globalKey], (result) => {
                 let vol = 100;
@@ -184,11 +326,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Try to get live state from content script first
+        // Prefer the live state reported by the content script
         chrome.tabs.sendMessage(tabId, { action: 'getState' })
             .then((response) => {
                 if (response && response.volume !== undefined) {
                     applyToUI(response.volume, response.speed);
+                    if (response.mode !== undefined) {
+                        // keep the content script and popup in agreement
+                        void response.mode;
+                    }
                     updateSaveUI();
                 } else {
                     loadContext();
@@ -196,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(() => loadContext());
 
-        // Live sync: Listen for updates from the Overlay
+        // Live sync: listen for updates coming from the overlay
         chrome.runtime.onMessage.addListener((message) => {
             if (message.action === 'persistState') {
                 applyToUI(message.volume, message.speed);
@@ -206,23 +352,21 @@ document.addEventListener('DOMContentLoaded', () => {
         // Sync save UI when the overlay changes mode (storage keys change)
         chrome.storage.onChanged.addListener((changes, areaName) => {
             if (areaName !== 'local') return;
-            const relevantKeys = [tabKey, domainKey, globalKey];
-            if (relevantKeys.some(k => k in changes)) {
-                updateSaveUI();
-            }
+            const relevant = [tabKey, domainKey, globalKey];
+            if (relevant.some(k => k in changes)) updateSaveUI();
         });
 
-        // Event Listeners
-        volSlider.addEventListener('input', (e) => updateVolume(e.target.value, tabId, modeKeys));
-        btnVolReset.addEventListener('click', () => updateVolume(100, tabId, modeKeys));
+        // Event listeners
+        volSlider.addEventListener('input', (e) => updateVolume(e.target.value, tabId, keys));
+        btnVolReset.addEventListener('click', () => updateVolume(100, tabId, keys));
         btnVolMute.addEventListener('click', () => {
             const currentVol = parseInt(volSlider.value, 10);
-            updateVolume(currentVol === 0 ? 100 : 0, tabId, modeKeys);
+            updateVolume(currentVol === 0 ? 100 : 0, tabId, keys);
         });
 
-        speedSlider.addEventListener('input', (e) => updateSpeed(e.target.value, tabId, modeKeys));
-        btnSpeedReset.addEventListener('click', () => updateSpeed(100, tabId, modeKeys));
-        btnSpeedFast.addEventListener('click', () => updateSpeed(200, tabId, modeKeys));
+        speedSlider.addEventListener('input', (e) => updateSpeed(e.target.value, tabId, keys));
+        btnSpeedReset.addEventListener('click', () => updateSpeed(100, tabId, keys));
+        btnSpeedFast.addEventListener('click', () => updateSpeed(200, tabId, keys));
 
         function updateSaveUI() {
             chrome.storage.local.get([tabKey, domainKey, globalKey], (result) => {
@@ -252,18 +396,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const notifyOverlay = () => {
-            chrome.tabs.sendMessage(tabId, { action: 'refreshPreset' }).catch(() => {});
+            chrome.tabs.sendMessage(tabId, { action: 'refreshPreset' }).catch(() => { });
         };
 
         btnSaveTab.addEventListener('click', () => {
-            // Auto-switch: Tab is highest, just save it
             const payload = { [tabKey]: { volume: parseInt(volSlider.value, 10), speed: parseInt(speedSlider.value, 10) } };
             chrome.storage.local.set(payload, () => { updateSaveUI(); notifyOverlay(); });
         });
 
         btnSaveDomain.addEventListener('click', () => {
             if (!domain) return;
-            // Auto-switch: Clear Tab preset so Domain can take over immediately
             const payload = { [domainKey]: { volume: parseInt(volSlider.value, 10), speed: parseInt(speedSlider.value, 10) } };
             chrome.storage.local.remove([tabKey], () => {
                 chrome.storage.local.set(payload, () => { updateSaveUI(); notifyOverlay(); });
@@ -271,7 +413,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         btnSaveGlobal.addEventListener('click', () => {
-            // Auto-switch: Clear Tab and Domain presets so Global can take over immediately
             const payload = { [globalKey]: { volume: parseInt(volSlider.value, 10), speed: parseInt(speedSlider.value, 10) } };
             chrome.storage.local.remove([tabKey, domainKey], () => {
                 chrome.storage.local.set(payload, () => { updateSaveUI(); notifyOverlay(); });
@@ -283,9 +424,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // falls back to the next layer (Tab -> Domain -> Global -> default).
             chrome.storage.local.get([tabKey, domainKey, globalKey], (result) => {
                 let keyToRemove = null;
-                if (result[tabKey])                    keyToRemove = tabKey;
+                if (result[tabKey]) keyToRemove = tabKey;
                 else if (domain && result[domainKey]) keyToRemove = domainKey;
-                else if (result[globalKey])            keyToRemove = globalKey;
+                else if (result[globalKey]) keyToRemove = globalKey;
 
                 if (keyToRemove) {
                     chrome.storage.local.remove([keyToRemove], () => { updateSaveUI(); notifyOverlay(); });

@@ -1,25 +1,31 @@
 {
   "name": "media-extensions",
-  "version": "1.5",
-  "description": "This is a simple browser extension I put together to give you more control over your browser's audio and video. If you've ever felt like a video was too quiet even at 100%, or if you wanted to fly through a long lecture without clicking menus, this is for you.",
+  "version": "2.0.0",
+  "description": "Boost volume up to 500% and playback speed up to 16x for individual tabs, only on the sites you allow.",
   "main": "index.js",
   "devDependencies": {
     "puppeteer": "^24.42.0"
   },
   "scripts": {
     "build:manifests": "node scripts/build-manifests.js",
+    "build:xpi": "bash scripts/build-xpi.sh",
     "test": "node tests/extension.e2e.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Zafkiel-dal/Tab-controller.git"
+    "url": "git+https://github.com/Ray4AI/Tab-controller.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "firefox",
+    "extension",
+    "volume-booster",
+    "playback-speed"
+  ],
+  "author": "Ray4AI",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/Zafkiel-dal/Tab-controller/issues"
+    "url": "https://github.com/Ray4AI/Tab-controller/issues"
   },
-  "homepage": "https://github.com/Zafkiel-dal/Tab-controller#readme"
+  "homepage": "https://github.com/Ray4AI/Tab-controller#readme"
 }
